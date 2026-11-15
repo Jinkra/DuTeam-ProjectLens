@@ -11,11 +11,14 @@ ProjectLens 通过 Agent 工作流分析项目材料，按照 AI Web 竞赛评�
 - 粘贴项目材料或导入 TXT / Markdown 文件
 - 六维加权评分、优先问题和改进建议
 - Agent 执行路径与评分证据链展示
+- 商业化产品门户与登录、注册入口
+- AI 工具中心与最近使用记录
+- 可拖拽、连线、配置和运行的节点式工作流工作台
 - 支持 OpenAI 兼容 API，未配置密钥时自动进入演示模式
 
 ## 技术栈
 
-- Web：Vue 3、Vite、Lucide Icons
+- Web：Vue 3、Vite、XYFlow、Lucide Icons
 - API：Node.js、Express、JWT、bcryptjs
 - 数据：本地 JSON 存储（首版 Demo）
 - AI：OpenAI-compatible Chat Completions API
