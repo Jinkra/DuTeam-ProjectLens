@@ -1,12 +1,16 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { ArrowRight, Check, ChevronRight, FileText, Plus, ScanSearch, ShieldCheck, Sparkles, Upload, X } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { ArrowRight, Check, ChevronRight, FileText, LoaderCircle, Plus, ScanSearch, ShieldCheck, Sparkles, Upload, X } from 'lucide-vue-next'
 import { api } from '../api'
 import AppShell from './AppShell.vue'
 import ProjectContextBar from './ProjectContextBar.vue'
 
 const props = defineProps({ user: Object, embedded: Boolean, project: Object }); defineEmits(['navigate', 'logout'])
 const projects = ref([]); const selected = ref(null); const showCreate = ref(false); const loading = ref(false); const error = ref('')
+const reviewing = ref(false)
+const reviewProgress = ref(0)
+const reviewStage = ref('准备评审')
+let reviewTimer
 const form = reactive({ name: props.project?.name || 'ProjectLens', category: props.project?.category || 'AI教育与学习平台', description: props.project?.description || '面向大学生竞赛与课程项目的证据驱动型AI评审与改进Agent。', material: props.project?.description || '请在这里补充项目材料，或从工作流的材料输入节点上传文件。' })
 const review = computed(() => selected.value?.review)
 const scoreTone = (score) => score >= 80 ? 'great' : score >= 70 ? 'good' : 'warn'
@@ -24,9 +28,30 @@ async function loadProjects() {
   if (!projects.value.length) showCreate.value = true
 }
 async function createProject() { error.value = ''; loading.value = true; try { const project = await api('/projects', { method: 'POST', body: JSON.stringify(form) }); projects.value.unshift(project); selected.value = project; showCreate.value = false } catch (e) { error.value = e.message } finally { loading.value = false } }
-async function runReview() { loading.value = true; error.value = ''; try { const project = await api(`/projects/${selected.value.id}/review`, { method: 'POST' }); selected.value = project; projects.value = projects.value.map((item) => item.id === project.id ? project : item) } catch (e) { error.value = e.message } finally { loading.value = false } }
+const reviewStages = [{ at: 8, text: '正在解析项目材料' }, { at: 30, text: '正在定位评分证据' }, { at: 55, text: '正在执行六维评分' }, { at: 76, text: '正在核验风险与材料缺口' }, { at: 90, text: '正在生成评审结论' }]
+function startReviewProgress() {
+  clearInterval(reviewTimer); reviewProgress.value = 5; reviewStage.value = reviewStages[0].text
+  reviewTimer = setInterval(() => {
+    if (reviewProgress.value >= 92) return
+    reviewProgress.value += reviewProgress.value < 55 ? 3 : 1
+    reviewStage.value = [...reviewStages].reverse().find((stage) => reviewProgress.value >= stage.at)?.text || reviewStages[0].text
+  }, 180)
+}
+async function finishReviewProgress(text) {
+  clearInterval(reviewTimer); reviewStage.value = text; reviewProgress.value = 100
+  await new Promise((resolve) => setTimeout(resolve, 380))
+}
+async function runReview() {
+  reviewing.value = true; error.value = ''; startReviewProgress()
+  try {
+    const project = await api(`/projects/${selected.value.id}/review`, { method: 'POST' })
+    selected.value = project; projects.value = projects.value.map((item) => item.id === project.id ? project : item)
+    await finishReviewProgress(project.review?.mode === 'ai' ? '模型评审完成' : '规则辅助评审完成')
+  } catch (e) { error.value = e.message; await finishReviewProgress('评审未完成') } finally { reviewing.value = false }
+}
 function importText(event) { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { form.material = String(reader.result || '') }; reader.readAsText(file) }
 onMounted(() => loadProjects().catch((e) => { error.value = e.message }))
+onBeforeUnmount(() => clearInterval(reviewTimer))
 </script>
 
 <template>
@@ -34,7 +59,7 @@ onMounted(() => loadProjects().catch((e) => { error.value = e.message }))
     <ProjectContextBar :project="project" active="review" @navigate="$emit('navigate', $event)" />
     <div class="review-layout" :class="{ 'workspace-review': project }">
       <aside class="project-rail"><div class="rail-heading"><div><h3>评审项目</h3><p>{{ projects.length }}个项目</p></div><button class="icon-button" title="新建项目" @click="showCreate = true"><Plus :size="17" /></button></div><button v-for="project in projects" :key="project.id" class="rail-project" :class="{ active: selected?.id === project.id }" @click="selected = project"><span>{{ project.name.slice(0, 1) }}</span><div><strong>{{ project.name }}</strong><small>{{ project.review ? `${project.review.total}分 · 已完成` : '等待评审' }}</small></div></button><button class="new-project-dashed" @click="showCreate = true"><Plus :size="16" />新建评审项目</button></aside>
-      <main class="review-workspace"><template v-if="selected"><div class="review-heading"><div><p class="kicker">{{ selected.category }}</p><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><button class="button button-primary" :disabled="loading" @click="runReview"><Sparkles :size="17" />{{ loading ? 'Agent正在评审...' : review ? '重新评审' : '开始AI评审' }}</button></div><p v-if="error" class="error-banner">{{ error }}</p>
+      <main class="review-workspace"><template v-if="selected"><div class="review-heading"><div><p class="kicker">{{ selected.category }}</p><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><button class="button button-primary" :disabled="reviewing" @click="runReview"><LoaderCircle v-if="reviewing" class="spin" :size="17" /><Sparkles v-else :size="17" />{{ reviewing ? '正在评审...' : review ? '重新评审' : '开始AI评审' }}</button></div><section v-if="reviewing" class="analysis-progress review-progress"><div class="analysis-progress-head"><span><LoaderCircle class="spin" :size="17" /></span><div><strong>{{ reviewStage }}</strong><small>系统正在读取项目材料并形成可追溯的评分结论</small></div><b>{{ reviewProgress }}%</b></div><div class="analysis-progress-track"><i :style="{ width: `${reviewProgress}%` }"></i></div><div class="analysis-progress-stages"><span v-for="stage in reviewStages" :key="stage.text" :class="{ active: reviewProgress >= stage.at }">{{ stage.text.replace('正在', '') }}</span></div></section><p v-if="error" class="error-banner">{{ error }}</p>
         <template v-if="review"><section class="review-overview"><article class="score-card"><div class="score-top"><div><span>综合评分</span><strong>{{ review.total }}</strong><small>/100</small></div><em>{{ review.mode === 'ai' ? 'AI智能评审' : '规则辅助评审' }}</em></div><p>{{ review.summary }}</p><div class="dimension-grid"><div v-for="item in review.dimensions" :key="item.key"><div><span>{{ item.label }} <small>{{ item.weight }}%</small></span><strong>{{ item.score }}</strong></div><div class="score-bar"><i :class="scoreTone(item.score)" :style="{ width: `${item.score}%` }"></i></div></div></div></article><article class="agent-trace"><div class="card-heading"><div><p class="kicker">AGENT TRACE</p><h3>评审执行路径</h3></div><ShieldCheck :size="22" /></div><ol><li><span><Check :size="13" /></span><div><strong>材料解析</strong><small>识别目标与技术关键词</small></div></li><li><span><Check :size="13" /></span><div><strong>证据检索</strong><small>定位评分原始依据</small></div></li><li><span><Check :size="13" /></span><div><strong>多维评分</strong><small>六项标准加权计算</small></div></li><li><span><Check :size="13" /></span><div><strong>风险核验</strong><small>检查材料缺口</small></div></li></ol></article></section>
           <section class="review-card"><div class="card-heading"><div><p class="kicker">PRIORITY FINDINGS</p><h3>优先改进项</h3></div><span>{{ review.findings.length }}项</span></div><div class="finding-list"><article v-for="(item, index) in review.findings" :key="item.title"><span class="finding-priority" :class="item.level">P{{ index + 1 }}</span><div><h4>{{ item.title }}</h4><p>{{ item.evidence }}</p><div><ChevronRight :size="15" />{{ item.action }}</div></div></article></div></section>
           <section class="review-card"><div class="card-heading"><div><p class="kicker">EVIDENCE CHAIN</p><h3>评分证据链</h3></div></div><div class="evidence-grid"><article v-for="item in review.evidence" :key="item.quote"><div><FileText :size="15" />{{ item.source }}</div><blockquote>“{{ item.quote }}”</blockquote><small>支撑维度：{{ item.dimension }}</small></article></div></section></template>
