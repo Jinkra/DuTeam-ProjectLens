@@ -33,9 +33,9 @@ function startReviewProgress() {
   clearInterval(reviewTimer); reviewProgress.value = 5; reviewStage.value = reviewStages[0].text
   reviewTimer = setInterval(() => {
     if (reviewProgress.value >= 92) return
-    reviewProgress.value += reviewProgress.value < 55 ? 3 : 1
+    reviewProgress.value += reviewProgress.value < 60 ? 4 : 2
     reviewStage.value = [...reviewStages].reverse().find((stage) => reviewProgress.value >= stage.at)?.text || reviewStages[0].text
-  }, 180)
+  }, 160)
 }
 async function finishReviewProgress(text) {
   clearInterval(reviewTimer); reviewStage.value = text; reviewProgress.value = 100
@@ -44,7 +44,10 @@ async function finishReviewProgress(text) {
 async function runReview() {
   reviewing.value = true; error.value = ''; startReviewProgress()
   try {
-    const project = await api(`/projects/${selected.value.id}/review`, { method: 'POST' })
+    const [project] = await Promise.all([
+      api(`/projects/${selected.value.id}/review`, { method: 'POST' }),
+      new Promise((resolve) => setTimeout(resolve, 4200)),
+    ])
     selected.value = project; projects.value = projects.value.map((item) => item.id === project.id ? project : item)
     await finishReviewProgress(project.review?.mode === 'ai' ? '模型评审完成' : '规则辅助评审完成')
   } catch (e) { error.value = e.message; await finishReviewProgress('评审未完成') } finally { reviewing.value = false }

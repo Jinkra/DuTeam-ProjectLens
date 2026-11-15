@@ -32,7 +32,7 @@ async function runAnalysis() {
     analysisProgress.value += analysisProgress.value < 60 ? 4 : 2
     analysisStage.value = [...stages].reverse().find((stage) => analysisProgress.value >= stage.at)?.text || stages[0].text
   }, 150)
-  await new Promise((resolve) => setTimeout(resolve, 1350))
+  await new Promise((resolve) => setTimeout(resolve, 4200))
   clearInterval(analysisTimer); analysisProgress.value = 100; analysisStage.value = '迭代分析完成'
   await new Promise((resolve) => setTimeout(resolve, 350))
   analysisReady.value = true
