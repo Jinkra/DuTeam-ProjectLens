@@ -30,7 +30,12 @@ const quickPrompts = [
   { icon: MessageSquareText, text: '模拟评委追问并组织回答' },
 ]
 const modes = ['项目问答', '材料分析', '答辩准备']
-const efforts = ['快速响应', '标准推理', '深度分析']
+const efforts = [
+  { name: '快速响应', multiplier: 1, description: '优先速度，适合简单问答' },
+  { name: '标准推理', multiplier: 2, description: '平衡速度与分析深度' },
+  { name: '深度分析', multiplier: 3, description: '完整核验材料与项目证据' },
+]
+const currentEffort = computed(() => efforts.find((item) => item.name === effort.value) || efforts[1])
 const projectContext = computed(() => {
   try {
     const raw = localStorage.getItem(`projectlens_${props.user?.id || props.user?.email || 'anonymous'}_${props.project?.id || 'default'}_workflow`)
@@ -137,7 +142,7 @@ onBeforeUnmount(stopTimer)
           <div v-if="menu" class="composer-menu">
             <template v-if="menu === 'add'"><button @click="fileInput?.click()"><Paperclip :size="16" /><span><strong>添加文件</strong><small>加入本次项目对话</small></span></button><button @click="menu = ''"><FileText :size="16" /><span><strong>项目知识库</strong><small>已自动连接{{ contextCount }}项上下文</small></span><Check :size="14" /></button></template>
             <template v-else-if="menu === 'mode'"><button v-for="item in modes" :key="item" @click="mode = item; menu = ''"><span><strong>{{ item }}</strong><small>{{ item === '项目问答' ? '围绕项目上下文回答' : item === '材料分析' ? '重点检索材料与证据' : '以评委视角准备表达' }}</small></span><Check v-if="mode === item" :size="14" /></button></template>
-            <template v-else><button v-for="item in efforts" :key="item" @click="effort = item; menu = ''"><Sparkles :size="15" /><span><strong>{{ item }}</strong><small>{{ item === '快速响应' ? '优先速度' : item === '标准推理' ? '平衡速度与分析' : '更完整地核验项目证据' }}</small></span><Check v-if="effort === item" :size="14" /></button></template>
+            <template v-else><button v-for="item in efforts" :key="item.name" @click="effort = item.name; menu = ''"><Sparkles :size="15" /><span><strong>{{ item.name }}<em>{{ item.multiplier }}x用量</em></strong><small>{{ item.description }}</small></span><Check v-if="effort === item.name" :size="14" /></button></template>
           </div>
           <div class="codex-input-shell" @click="menu = ''">
             <div v-if="attachments.length" class="composer-attachments"><span v-for="file in attachments" :key="file"><FileText :size="12" />{{ file }}<button title="移除附件" @click.stop="attachments = attachments.filter((item) => item !== file)"><X :size="11" /></button></span></div>
@@ -145,13 +150,13 @@ onBeforeUnmount(stopTimer)
             <div class="composer-toolbar">
               <button class="composer-icon" title="添加文件和上下文" @click.stop="menu = menu === 'add' ? '' : 'add'"><Plus :size="17" /></button>
               <button class="composer-pick" @click.stop="menu = menu === 'mode' ? '' : 'mode'">{{ mode }}<ChevronDown :size="12" /></button>
-              <button class="composer-pick" @click.stop="menu = menu === 'effort' ? '' : 'effort'"><Sparkles :size="13" />{{ effort }}<ChevronDown :size="12" /></button>
+              <button class="composer-pick" @click.stop="menu = menu === 'effort' ? '' : 'effort'"><Sparkles :size="13" />{{ effort }}<b>{{ currentEffort.multiplier }}x</b><ChevronDown :size="12" /></button>
               <span></span>
               <button v-if="sending" class="composer-send armed" title="停止生成" @click.stop="stopResponse"><Square :size="14" /></button>
               <button v-else class="composer-send" :class="{ armed: input.trim() }" :disabled="!input.trim()" title="发送" @click.stop="sendMessage()"><ArrowUp :size="17" /></button>
             </div>
           </div>
-          <div class="composer-meta"><span>Enter发送</span><span>每次对话计入1x会员用量</span></div>
+          <div class="composer-meta"><span>Enter发送</span><span>本次对话计入{{ currentEffort.multiplier }}x会员用量</span></div>
           <input ref="fileInput" hidden type="file" multiple @change="handleFiles" />
         </footer>
       </main>

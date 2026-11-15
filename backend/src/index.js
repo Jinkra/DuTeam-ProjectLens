@@ -154,7 +154,8 @@ app.post('/api/assistant/chat', requireAuth, async (req, res) => {
   const { project, question, messages, context, preferences } = req.body
   if (!project?.id || !project?.name || !question?.trim()) return res.status(400).json({ message: '请选择项目并输入问题。' })
   if (question.trim().length > 2000) return res.status(400).json({ message: '单次提问不能超过2000字。' })
-  const consumed = await consumeUsage(req.user.sub)
+  const effortUnits = { 快速响应: 1, 标准推理: 2, 深度分析: 3 }
+  const consumed = await consumeUsage(req.user.sub, effortUnits[preferences?.effort] || 2)
   if (consumed.error) return res.status(consumed.status).json({ message: consumed.error, usage: consumed.usage })
   try {
     const answer = await chatWithProject({ project, question: question.trim(), messages, context, preferences })
