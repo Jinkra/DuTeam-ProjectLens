@@ -13,6 +13,7 @@ import IterationAnalysis from './components/IterationAnalysis.vue'
 import DefenseCoach from './components/DefenseCoach.vue'
 import ProjectAssistant from './components/ProjectAssistant.vue'
 import WorkspaceProjects from './components/WorkspaceProjects.vue'
+import AccountMembership from './components/AccountMembership.vue'
 import { getActiveWorkspace, loadAccountProjects } from './projectStorage'
 
 const token = ref(localStorage.getItem('projectlens_token'))
@@ -25,12 +26,13 @@ const authOpen = ref(false)
 const authMode = ref('login')
 const postAuthPage = ref('tools')
 const requestedProjectTool = ref(null)
-const consolePages = new Set(['tools', 'projects', 'workflow-projects', 'review-projects', 'workflow', 'review', 'analysis', 'coach', 'assistant'])
+const consolePages = new Set(['tools', 'projects', 'membership', 'workflow-projects', 'review-projects', 'workflow', 'review', 'analysis', 'coach', 'assistant'])
 const activeProject = ref(user.value ? getActiveWorkspace(user.value) : null)
 const isConsolePage = computed(() => consolePages.has(page.value))
 const consoleMeta = computed(() => ({
   tools: { active: 'tools', title: '工具中心', subtitle: '选择一个工具，开始处理你的项目。' },
   projects: { active: 'projects', title: '项目空间', subtitle: '一个项目，一套完整的竞赛改进工作区。' },
+  membership: { active: 'membership', title: '会员中心', subtitle: '查看当前套餐、到期时间与账户用量。' },
   'workflow-projects': { active: 'workflow-projects', title: '工作流项目', subtitle: '管理自动化工作流并继续编排。' },
   'review-projects': { active: 'review-projects', title: '评审项目', subtitle: '管理参赛项目并继续评审。' },
   workflow: { active: 'workflow', title: '工作流工作台', subtitle: '竞赛项目自动评审与流程编排', full: true },
@@ -106,6 +108,7 @@ onBeforeUnmount(() => {
           <div :key="page" class="console-content-page">
             <ToolHub v-if="page === 'tools'" embedded :user="user" @navigate="navigate" @logout="logout" />
             <WorkspaceProjects v-else-if="page === 'projects'" :user="user" :requested-tool="requestedProjectTool" @navigate="navigate" />
+            <AccountMembership v-else-if="page === 'membership'" :user="user" @navigate="navigate" />
             <ProjectLibrary v-else-if="page === 'workflow-projects'" embedded :user="user" kind="workflow" @navigate="navigate" @logout="logout" />
             <ProjectLibrary v-else-if="page === 'review-projects'" embedded :user="user" kind="review" @navigate="navigate" @logout="logout" />
             <WorkflowStudio v-else-if="page === 'workflow'" embedded :user="user" :project="activeProject" @navigate="navigate" @logout="logout" />

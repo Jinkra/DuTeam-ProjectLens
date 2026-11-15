@@ -23,9 +23,9 @@ const defaultAdmin = {
 }
 // Rolling-window limits are enforced server-side for every AI operation.
 const planLimits = {
-  free: { fourHours: 5, day: 15, total: 100 },
-  pro: { fourHours: 40, day: 150, total: 2000 },
-  team: { fourHours: 120, day: 500, total: 10000 },
+  free: { fourHours: 5, day: 15, week: 50, month: 100, total: 100 },
+  pro: { fourHours: 40, day: 150, week: 800, month: 2000, total: 2000 },
+  team: { fourHours: 120, day: 500, week: 3000, month: 10000, total: 10000 },
 }
 
 function publicUser(user) {
@@ -54,7 +54,9 @@ function usageSnapshot(user, now = Date.now()) {
   const used = {
     fourHours: events.filter((time) => time >= now - 4 * 60 * 60 * 1000).length,
     day: events.filter((time) => time >= now - 24 * 60 * 60 * 1000).length,
-    total: events.filter((time) => time >= periodStart).length,
+    week: events.filter((time) => time >= now - 7 * 24 * 60 * 60 * 1000).length,
+    month: events.filter((time) => time >= now - 30 * 24 * 60 * 60 * 1000).length,
+    total: events.filter((time) => time >= now - 30 * 24 * 60 * 60 * 1000).length,
   }
   return { used, limits, periodStartedAt: new Date(periodStart || now).toISOString() }
 }
@@ -65,7 +67,7 @@ async function consumeUsage(userId, requestedUnits = 1) {
     const user = data.users.find((item) => item.id === userId)
     if (!user || user.status === 'suspended') return { error: user ? '账号已被暂停。' : '没有找到该用户。', status: user ? 403 : 404 }
     const usage = usageSnapshot(user)
-    const exceeded = Object.keys(usage.used).find((key) => usage.used[key] + units > usage.limits[key])
+    const exceeded = ['fourHours', 'day', 'week', 'month'].find((key) => usage.used[key] + units > usage.limits[key])
     if (exceeded) return { error: `当前${user.plan || 'free'}套餐用量已达上限，请升级套餐或等待窗口重置。`, status: 429, usage }
     const timestamp = new Date().toISOString()
     user.usageEvents = [...(user.usageEvents || []), ...Array.from({ length: units }, () => timestamp)]

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { ArrowLeft, CalendarDays, Check, Clock3, CreditCard, Crown, Gauge, LogIn, RefreshCw, ShieldCheck, Sparkles, Users, X } from 'lucide-vue-next'
+import { ArrowLeft, Check, CreditCard, Crown, LogIn, Sparkles, Users, X } from 'lucide-vue-next'
 import PixelCard from './PixelCard.vue'
 import SiteFooter from './SiteFooter.vue'
 import { api } from '../api'
@@ -18,13 +18,6 @@ const plans = [
   { id: 'team', name: 'Team', monthly: 99, yearly: 79, icon: Users, note: '适合团队、实验室与课程班', limits: '120 / 500 / 10,000', colors: ['#e6e0f5', '#cabde9', '#8875be'], features: ['团队共享工作空间', '成员与权限管理', '统一用量管理', '优先模型调用队列'] },
 ]
 const planName = computed(() => plans.find((plan) => plan.id === membership.value?.plan)?.name || 'Free')
-const formatDate = (value) => value ? new Date(value).toLocaleDateString('zh-CN') : '长期有效'
-const usageRows = computed(() => membership.value ? [
-  { key: 'fourHours', label: '最近4小时', icon: Clock3 },
-  { key: 'day', label: '最近24小时', icon: Gauge },
-  { key: 'total', label: '当前周期总用量', icon: CalendarDays },
-] : [])
-const percent = (key) => Math.min(100, Math.round(membership.value.usage.used[key] / membership.value.usage.limits[key] * 100))
 
 async function loadMembership() {
   if (!props.user) { membership.value = null; return }
@@ -55,11 +48,6 @@ onMounted(loadMembership)
 
     <main class="membership-page">
       <section class="membership-intro"><p class="kicker">MEMBERSHIP</p><h1>选择与你的项目节奏匹配的额度</h1><p>所有注册用户默认使用Free会员。套餐额度同时受4小时、24小时与当前周期三档限制。</p></section>
-      <div v-if="loading && !membership" class="membership-loading"><RefreshCw :size="22" />正在读取会员信息...</div>
-      <section v-else-if="membership" class="member-identity"><div class="member-avatar">{{ props.user?.name?.slice(0, 1) }}</div><div><p>ACCOUNT MEMBERSHIP</p><h2>{{ props.user?.name }}</h2><span>{{ props.user?.email }}</span></div><div class="member-id"><small>用户ID</small><code>{{ membership.user.id }}</code></div><div class="member-plan"><Crown :size="18" /><span><small>当前会员</small><strong>{{ planName }}</strong></span></div><div class="member-expiry"><small>会员到期时间</small><strong>{{ formatDate(membership.expiresAt) }}</strong></div></section>
-
-      <section v-if="membership" class="usage-section"><div class="section-title"><div><p class="kicker">USAGE CONTROL</p><h2>我的用量</h2></div><span>项目助手：快速1x、标准2x、深度3x</span></div><div class="usage-grid"><article v-for="row in usageRows" :key="row.key" class="usage-card"><div class="usage-card-head"><span><component :is="row.icon" :size="18" /></span><div><small>{{ row.label }}</small><strong>{{ membership.usage.used[row.key] }}<i>/{{ membership.usage.limits[row.key] }}</i></strong></div><b>{{ percent(row.key) }}%</b></div><div class="usage-progress"><i :style="{ width: `${percent(row.key)}%` }"></i></div><p>{{ membership.usage.limits[row.key] - membership.usage.used[row.key] }}次可用</p></article></div><div class="usage-note"><ShieldCheck :size="17" /><span>达到任一时间窗口上限后，系统会暂停新的AI评审、项目助手对话与工作流运行。</span></div></section>
-
       <section class="plan-section"><div class="section-title plan-title-row"><div><p class="kicker">AVAILABLE PLANS</p><h2>会员套餐</h2></div><div class="light-billing-toggle"><button :class="{ active: billing === 'monthly' }" @click="billing = 'monthly'">月付</button><button :class="{ active: billing === 'yearly' }" @click="billing = 'yearly'">年付<span>省24%</span></button></div></div><p v-if="message" class="member-message"><Check :size="16" />{{ message }}</p><div class="member-plan-grid premium-plan-grid"><PixelCard v-for="(plan, index) in plans" :key="plan.id" :colors="plan.colors" :glow-color="plan.colors[2]" :intro-delay="index * 120" :class="{ active: membership?.plan === plan.id, featured: plan.featured }"><div class="commercial-plan-card"><span v-if="plan.featured" class="plan-recommended">最受欢迎</span><div class="commercial-plan-head"><span><component :is="plan.icon" :size="21" /></span><div><h3>{{ plan.name }}</h3><p>{{ plan.note }}</p></div></div><div class="commercial-price"><strong>{{ priceText(plan) }}</strong><span v-if="plan.monthly">/月</span></div><p class="billing-caption">{{ billing === 'yearly' && plan.yearly ? '按年订阅，价格已折算为每月' : plan.id === 'free' ? '永久免费使用' : '按月订阅，随时取消' }}</p><div class="plan-limit"><small>4h / 24h / 周期额度</small><b>{{ plan.limits }}</b></div><ul><li v-for="feature in plan.features" :key="feature"><Check :size="15" />{{ feature }}</li></ul><button class="button button-wide" :class="membership?.plan === plan.id ? 'button-ghost' : 'button-primary'" :disabled="membership?.plan === plan.id" @click.stop="choosePlan(plan)">{{ membership?.plan === plan.id ? '当前套餐' : user ? `选择${plan.name}` : '登录后购买' }}</button></div></PixelCard></div></section>
     </main>
     <SiteFooter />
