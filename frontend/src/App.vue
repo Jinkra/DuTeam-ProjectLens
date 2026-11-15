@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import PortalPage from './components/PortalPage.vue'
 import AuthModal from './components/AuthModal.vue'
 import ToolHub from './components/ToolHub.vue'
@@ -7,6 +7,7 @@ import WorkflowStudio from './components/WorkflowStudio.vue'
 import ReviewTool from './components/ReviewTool.vue'
 import SubscriptionPage from './components/SubscriptionPage.vue'
 import AdminPage from './components/AdminPage.vue'
+import ProjectLibrary from './components/ProjectLibrary.vue'
 
 const token = ref(localStorage.getItem('projectlens_token'))
 const user = ref(JSON.parse(localStorage.getItem('projectlens_user') || 'null'))
@@ -17,6 +18,8 @@ const page = ref(requestedAdmin ? 'admin' : requestedPage === 'pricing' ? 'prici
 const authOpen = ref(false)
 const authMode = ref('login')
 const postAuthPage = ref('tools')
+const transitionName = ref('page-transition')
+const consolePages = new Set(['tools', 'workflow-projects', 'review-projects', 'workflow', 'review'])
 
 function openAuth(mode = 'login') { authMode.value = mode; postAuthPage.value = page.value === 'pricing' ? 'pricing' : 'tools'; authOpen.value = true }
 function authenticated(data) {
@@ -27,9 +30,16 @@ function authenticated(data) {
 }
 function navigate(target) {
   if (!token.value && !['portal', 'pricing', 'admin'].includes(target)) return openAuth('login')
-  page.value = target
-  history.replaceState({}, '', target === 'admin' ? '/admin' : target === 'portal' ? '/' : `/#${target}`)
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  const consoleSwitch = consolePages.has(page.value) && consolePages.has(target)
+  transitionName.value = consoleSwitch ? 'console-transition' : 'page-transition'
+  const updatePage = () => {
+    page.value = target
+    history.replaceState({}, '', target === 'admin' ? '/admin' : target === 'portal' ? '/' : `/#${target}`)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  if (consoleSwitch && document.startViewTransition) {
+    document.startViewTransition(async () => { updatePage(); await nextTick() })
+  } else updatePage()
 }
 function logout() {
   const stayOnMembership = page.value === 'pricing'
@@ -59,10 +69,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <Transition name="page-transition" mode="out-in">
+  <Transition :name="transitionName" mode="out-in">
     <div :key="page" class="app-page">
       <PortalPage v-if="page === 'portal'" :user="user" @auth="openAuth" @navigate="navigate" />
       <ToolHub v-else-if="page === 'tools'" :user="user" @navigate="navigate" @logout="logout" />
+      <ProjectLibrary v-else-if="page === 'workflow-projects'" :user="user" kind="workflow" @navigate="navigate" @logout="logout" />
+      <ProjectLibrary v-else-if="page === 'review-projects'" :user="user" kind="review" @navigate="navigate" @logout="logout" />
       <WorkflowStudio v-else-if="page === 'workflow'" :user="user" @navigate="navigate" @logout="logout" />
       <ReviewTool v-else-if="page === 'review'" :user="user" @navigate="navigate" @logout="logout" />
       <SubscriptionPage v-else-if="page === 'pricing'" :user="user" @navigate="navigate" @logout="logout" @auth="openAuth" />
