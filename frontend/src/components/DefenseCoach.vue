@@ -31,8 +31,8 @@ function restart() { started.value = false; current.value = 0; answer.value = ''
 
 <template>
   <component :is="embedded ? 'div' : AppShell" v-bind="embedded ? {} : { user, active: 'coach', title: 'AI 答辩教练', subtitle: '模拟评委追问，训练清晰、可信、有证据的答辩表达。' }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
+    <ProjectContextBar :project="project" active="coach" @navigate="$emit('navigate', $event)" />
     <main class="coach-page">
-      <ProjectContextBar :project="project" active="coach" @navigate="$emit('navigate', $event)" />
       <section class="tool-steps"><span class="active"><b>1</b>选择项目与模式</span><i></i><span :class="{ active: started }"><b>2</b>回答模拟问题</span><i></i><span :class="{ active: feedback }"><b>3</b>查看教练反馈</span></section>
       <section v-if="!project" class="tool-empty"><FolderPlus :size="30" /><h2>先创建一个项目</h2><p>创建后即可在项目内进行答辩训练。</p><button class="button button-primary" @click="$emit('navigate', 'projects')">前往项目空间</button></section>
       <section v-else-if="!started" class="coach-start"><div class="coach-intro"><span><Bot :size="28" /></span><p class="kicker">DEFENSE SIMULATION</p><h2>为「{{ project.name }}」进行模拟答辩</h2><p>选择训练方向后，教练会逐题提问。你提交回答后会立即获得表达结构、证据充分度和改进建议。</p><div class="coach-flow-preview"><span><b>01</b>评委提问</span><ChevronRight :size="15" /><span><b>02</b>输入回答</span><ChevronRight :size="15" /><span><b>03</b>获得反馈</span></div></div><div class="coach-setup"><div class="setup-heading"><small>当前项目：{{ project.name }}</small><strong>本次训练约 5 分钟</strong></div><label>训练模式<select v-model="trainingMode"><option>综合答辩 · 3 题</option><option>技术深挖 · 3 题</option><option>商业价值 · 3 题</option></select></label><div class="coach-notes"><MessageSquareText :size="18" /><p><strong>回答建议</strong>先给结论，再说明机制，最后用数据或案例证明。</p></div><button class="button button-primary button-wide" @click="started = true"><Play :size="16" />开始 {{ trainingMode }}</button></div></section>

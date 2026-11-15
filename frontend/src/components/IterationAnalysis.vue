@@ -28,8 +28,8 @@ async function runAnalysis() {
 
 <template>
   <component :is="embedded ? 'div' : AppShell" v-bind="embedded ? {} : { user, active: 'analysis', title: '迭代效果分析', subtitle: '对比评审版本，确认每次改进带来的真实变化。' }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
+    <ProjectContextBar :project="project" active="analysis" @navigate="$emit('navigate', $event)" />
     <main class="analysis-page">
-      <ProjectContextBar :project="project" active="analysis" @navigate="$emit('navigate', $event)" />
       <section class="tool-steps"><span class="active"><b>1</b>当前项目</span><i></i><span class="active"><b>2</b>选择对比版本</span><i></i><span :class="{ active: analysisReady }"><b>3</b>查看分析结果</span></section>
       <section v-if="!project" class="tool-empty"><FolderPlus :size="30" /><h2>先创建一个项目</h2><p>创建后即可在项目内进行迭代分析。</p><button class="button button-primary" @click="$emit('navigate', 'projects')">前往项目空间</button></section>
       <template v-else><section class="analysis-controls"><div><p class="kicker">VERSION COMPARISON</p><h2>{{ project.name }} · 版本对比</h2><p>系统会汇总评分变化、已关闭问题和下一步建议。</p></div><div class="analysis-selectors"><label>基准版本<select v-model="baseline" @change="analysisReady = false"><option>v1.0 初次评审</option><option>v1.1 结构优化</option></select></label><GitCompareArrows :size="18" /><label>对比版本<select v-model="target" @change="analysisReady = false"><option>v1.3 当前版本</option><option>v1.2 功能完善</option></select></label><button class="button button-primary analysis-run" :disabled="analyzing || baseline === target" @click="runAnalysis"><LoaderCircle v-if="analyzing" class="spin" :size="16" /><Play v-else :size="16" />{{ analyzing ? '正在分析...' : '生成对比分析' }}</button></div></section>
