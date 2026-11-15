@@ -1,5 +1,5 @@
 <script setup>
-import { BarChart3, Bot, ChevronLeft, FileSearch, MessageCircleMore, Workflow } from 'lucide-vue-next'
+import { BarChart3, Bot, ChevronLeft, FileSearch, Workflow } from 'lucide-vue-next'
 defineProps({ project: Object, active: String })
 defineEmits(['navigate'])
 const tabs = [
@@ -7,7 +7,6 @@ const tabs = [
   { id: 'review', label: '项目评审', icon: FileSearch },
   { id: 'analysis', label: '迭代分析', icon: BarChart3 },
   { id: 'coach', label: 'AI 答辩教练', icon: Bot },
-  { id: 'assistant', label: 'AI 项目助手', icon: MessageCircleMore },
 ]
 </script>
 <template>

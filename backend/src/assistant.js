@@ -34,7 +34,7 @@ export async function chatWithProject({ project, question, messages = [], contex
       model: process.env.AI_MODEL || 'gpt-4o-mini',
       temperature: 0.35,
       messages: [
-        { role: 'system', content: `你是 DuTeam ProjectLens 的 AI 项目助手。只围绕给定项目上下文回答，明确区分已知事实与建议。回答使用简洁中文，优先给出可执行步骤；引用资料时写出资料名称。项目上下文：\n${projectContext}` },
+        { role: 'system', content: `你是 DuTeam ProjectLens 的 Duts 项目助手。只围绕给定项目上下文回答，明确区分已知事实与建议。回答使用简洁中文，优先给出可执行步骤；引用资料时写出资料名称。项目上下文：\n${projectContext}` },
         ...history,
         { role: 'user', content: question },
       ],
