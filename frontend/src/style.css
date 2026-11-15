@@ -136,6 +136,9 @@
 @media(prefers-reduced-motion:reduce){.assistant-message{animation:none}.assistant-thinking>button>i,.assistant-thinking>div i,.assistant-demo-thought i{animation:none}}
 .project-assistant-page{height:calc(100vh - 34px)}
 
+/* Portal hero emphasis */
+.portal-hero-v2 .hero-copy h1 em{display:inline-block;white-space:nowrap}
+
 /* Duts assistant entry points */
 .workspace-project-actions{display:flex;align-items:center;gap:9px;flex:none}.workspace-project-actions .button-ghost{background:#fff;color:#485d65;border-color:#d5e0e2}.workspace-project-actions .button-ghost:hover{border-color:#9fc8c3;background:#f2f8f7;color:#177f74}
 .workspace-preview-tools .assistant-preview-entry{grid-column:1/-1;padding-block:10px;border-color:#cfdad9;background:linear-gradient(90deg,#f6fbfa,#fff)}.workspace-preview-tools .assistant-preview-entry>span{background:#e4f3f0;color:#217f72}.workspace-preview-tools .assistant-preview-entry>svg{color:#4e716d}
