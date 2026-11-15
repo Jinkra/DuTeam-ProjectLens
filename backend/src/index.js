@@ -4,6 +4,7 @@ import cors from 'cors'
 import express from 'express'
 import crypto from 'node:crypto'
 import { requireAuth, signToken } from './auth.js'
+import { chatWithProject } from './assistant.js'
 import { createReview } from './review.js'
 import { readStore, updateStore } from './store.js'
 
@@ -147,6 +148,21 @@ app.post('/api/usage/consume', requireAuth, async (req, res) => {
   const result = await consumeUsage(req.user.sub, req.body.units)
   if (result.error) return res.status(result.status).json({ message: result.error, usage: result.usage })
   res.json(result)
+})
+
+app.post('/api/assistant/chat', requireAuth, async (req, res) => {
+  const { project, question, messages, context } = req.body
+  if (!project?.id || !project?.name || !question?.trim()) return res.status(400).json({ message: '请选择项目并输入问题。' })
+  if (question.trim().length > 2000) return res.status(400).json({ message: '单次提问不能超过 2000 字。' })
+  const consumed = await consumeUsage(req.user.sub)
+  if (consumed.error) return res.status(consumed.status).json({ message: consumed.error, usage: consumed.usage })
+  try {
+    const answer = await chatWithProject({ project, question: question.trim(), messages, context })
+    res.json({ ...answer, usage: consumed.usage })
+  } catch (error) {
+    console.error(error)
+    res.status(502).json({ message: 'AI 项目助手暂时无法回答，请稍后重试。' })
+  }
 })
 
 app.get('/api/admin/overview', requireAuth, requireAdmin, async (_req, res) => {

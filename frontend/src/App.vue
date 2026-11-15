@@ -11,6 +11,7 @@ import ProjectLibrary from './components/ProjectLibrary.vue'
 import AppShell from './components/AppShell.vue'
 import IterationAnalysis from './components/IterationAnalysis.vue'
 import DefenseCoach from './components/DefenseCoach.vue'
+import ProjectAssistant from './components/ProjectAssistant.vue'
 import WorkspaceProjects from './components/WorkspaceProjects.vue'
 import { getActiveWorkspace, loadAccountProjects } from './projectStorage'
 
@@ -24,7 +25,7 @@ const authOpen = ref(false)
 const authMode = ref('login')
 const postAuthPage = ref('tools')
 const requestedProjectTool = ref(null)
-const consolePages = new Set(['tools', 'projects', 'workflow-projects', 'review-projects', 'workflow', 'review', 'analysis', 'coach'])
+const consolePages = new Set(['tools', 'projects', 'workflow-projects', 'review-projects', 'workflow', 'review', 'analysis', 'coach', 'assistant'])
 const activeProject = ref(user.value ? getActiveWorkspace(user.value) : null)
 const isConsolePage = computed(() => consolePages.has(page.value))
 const consoleMeta = computed(() => ({
@@ -36,6 +37,7 @@ const consoleMeta = computed(() => ({
   review: { active: 'review', title: '项目智能评审', subtitle: '基于证据的六维项目分析与改进建议。' },
   analysis: { active: 'analysis', title: '迭代效果分析', subtitle: '对比评审版本，确认每次改进带来的真实变化。' },
   coach: { active: 'coach', title: 'AI 答辩教练', subtitle: '模拟评委追问，训练清晰、可信、有证据的答辩表达。' },
+  assistant: { active: 'assistant', title: 'AI 项目助手', subtitle: '基于当前项目资料进行连续对话与方案协作。' },
 }[page.value]))
 
 function openAuth(mode = 'login') { authMode.value = mode; postAuthPage.value = page.value === 'pricing' ? 'pricing' : 'tools'; authOpen.value = true }
@@ -51,11 +53,11 @@ function navigate(target) {
   target = typeof target === 'object' ? target.page : target
   if (!token.value && !['portal', 'pricing', 'admin'].includes(target)) return openAuth('login')
   if (['workflow-projects', 'review-projects'].includes(target)) target = 'projects'
-  if (selectProject && ['workflow', 'review', 'analysis', 'coach'].includes(target)) {
+  if (selectProject && ['workflow', 'review', 'analysis', 'coach', 'assistant'].includes(target)) {
     requestedProjectTool.value = target
     if (!loadAccountProjects('workspace', user.value).length) window.alert('请先创建项目，再使用该项目工具。')
     target = 'projects'
-  } else if (['workflow', 'review', 'analysis', 'coach'].includes(target) && !activeProject.value) {
+  } else if (['workflow', 'review', 'analysis', 'coach', 'assistant'].includes(target) && !activeProject.value) {
     requestedProjectTool.value = target
     window.alert('请先创建项目，再使用该项目工具。')
     target = 'projects'
@@ -110,6 +112,7 @@ onBeforeUnmount(() => {
             <ReviewTool v-else-if="page === 'review'" embedded :user="user" :project="activeProject" @navigate="navigate" @logout="logout" />
             <IterationAnalysis v-else-if="page === 'analysis'" embedded :user="user" :project="activeProject" @navigate="navigate" @logout="logout" />
             <DefenseCoach v-else-if="page === 'coach'" embedded :user="user" :project="activeProject" @navigate="navigate" @logout="logout" />
+            <ProjectAssistant v-else-if="page === 'assistant'" :user="user" :project="activeProject" @navigate="navigate" />
           </div>
         </Transition>
       </AppShell>

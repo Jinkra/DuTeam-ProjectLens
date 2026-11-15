@@ -8,7 +8,7 @@ const projects = ref(loadAccountProjects('workspace', props.user))
 const editing = ref(null)
 const recentProjects = computed(() => [...projects.value].sort((a, b) => new Date(b.lastOpenedAt) - new Date(a.lastOpenedAt)))
 function persist() { saveAccountProjects('workspace', props.user, projects.value) }
-const toolNames = { workflow: '工作流', review: '项目评审', analysis: '迭代分析', coach: 'AI 答辩教练' }
+const toolNames = { workflow: '工作流', review: '项目评审', analysis: '迭代分析', coach: 'AI 答辩教练', assistant: 'AI 项目助手' }
 function openProject(project) { project.lastOpenedAt = new Date().toISOString(); setActiveWorkspace(props.user, project); persist(); emit('navigate', props.requestedTool || 'workflow') }
 function openEditor(project = null) { editing.value = project ? { ...project } : { id: `project-${Date.now()}`, name: '', description: '', category: 'AI Agent 智能助手', status: '草稿', updatedAt: new Date().toISOString(), lastOpenedAt: new Date().toISOString() } }
 function saveProject() { if (!editing.value?.name.trim()) return; const item = { ...editing.value, name: editing.value.name.trim(), description: editing.value.description.trim(), updatedAt: new Date().toISOString() }; const index = projects.value.findIndex((project) => project.id === item.id); projects.value = index >= 0 ? projects.value.map((project) => project.id === item.id ? item : project) : [item, ...projects.value]; persist(); editing.value = null }
