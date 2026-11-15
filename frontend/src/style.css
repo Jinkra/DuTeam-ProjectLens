@@ -170,6 +170,12 @@
 @media(prefers-reduced-motion:reduce){.thinking-shimmer{animation:none;color:#56646a}.composer-menu{animation:none}}
 .codex-chat-panel{position:relative}
 
+/* Review version guidance */
+.review-version-notice{margin:16px 0;padding:13px 15px;border:1px solid #cfe4df;background:#f1f8f6;color:#37635d;display:flex;align-items:center;gap:9px}
+.review-version-notice>svg{color:#17877b;flex:none}.review-version-notice button{margin-left:auto;border:0;background:transparent;color:#187f74;display:flex;align-items:center;gap:5px;font-weight:700;cursor:pointer}
+.iteration-guide{min-height:340px}.iteration-guide p{max-width:560px;line-height:1.8}.iteration-guide .button{margin-top:8px}
+@media(max-width:620px){.review-version-notice{align-items:flex-start;flex-wrap:wrap}.review-version-notice button{width:100%;margin-left:25px}}
+
 /* Remove decorative English eyebrow labels */
 .kicker{display:none}
 

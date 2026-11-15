@@ -287,8 +287,16 @@ app.post('/api/projects/:id/review', requireAuth, async (req, res) => {
   const review = await createReview(project)
   const updated = await updateStore((store) => {
     const target = store.projects.find((item) => item.id === project.id)
-    target.review = { ...review, createdAt: new Date().toISOString() }
-    target.updatedAt = new Date().toISOString()
+    const now = new Date().toISOString()
+    target.reviewVersions = Array.isArray(target.reviewVersions) ? target.reviewVersions : []
+    if (!target.reviewVersions.length && target.review) {
+      target.reviewVersions.push({ ...target.review, id: crypto.randomUUID(), label: 'v1.0', createdAt: target.review.createdAt || target.updatedAt || now })
+    }
+    const label = `v1.${target.reviewVersions.length}`
+    const version = { ...review, id: crypto.randomUUID(), label, createdAt: now }
+    target.reviewVersions.push(version)
+    target.review = version
+    target.updatedAt = now
     return target
   })
   res.json(updated)
