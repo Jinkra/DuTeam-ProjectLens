@@ -9,8 +9,20 @@ import { readStore, updateStore } from './store.js'
 
 const app = express()
 const port = Number(process.env.PORT || 3001)
+const configuredOrigins = (process.env.WEB_ORIGINS || process.env.WEB_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+const isLocalOrigin = (origin) => /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
 
-app.use(cors({ origin: process.env.WEB_ORIGIN || 'http://localhost:5173' }))
+app.use(cors({
+  origin(origin, callback) {
+    const allowed = !origin
+      || configuredOrigins.includes(origin)
+      || (process.env.NODE_ENV !== 'production' && isLocalOrigin(origin))
+    callback(allowed ? null : new Error(`CORS blocked origin: ${origin}`), allowed)
+  },
+}))
 app.use(express.json({ limit: '2mb' }))
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, aiConfigured: Boolean(process.env.AI_API_KEY) }))

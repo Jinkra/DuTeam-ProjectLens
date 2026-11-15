@@ -42,6 +42,7 @@ npm run dev
 
 ```env
 JWT_SECRET=replace-with-a-long-random-string
+WEB_ORIGINS=http://localhost:5173,http://localhost:5174
 AI_API_KEY=
 AI_BASE_URL=https://api.openai.com/v1
 AI_MODEL=gpt-4o-mini
