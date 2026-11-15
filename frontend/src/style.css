@@ -136,6 +136,9 @@
 @media(prefers-reduced-motion:reduce){.assistant-message{animation:none}.assistant-thinking>button>i,.assistant-thinking>div i,.assistant-demo-thought i{animation:none}}
 .project-assistant-page{height:calc(100vh - 34px)}
 
+/* Workflow runtime edges */
+.studio-layout.workflow-running .vue-flow__edge-path{stroke:#536ce1;stroke-dasharray:9 7;animation:workflowEdgeFlow 1s linear infinite}.studio-layout.workflow-running .vue-flow__edge marker path{fill:#536ce1}@keyframes workflowEdgeFlow{to{stroke-dashoffset:-32}}
+
 /* Portal hero emphasis */
 .portal-hero-v2 .hero-copy h1 em{display:inline-block;white-space:nowrap}
 
