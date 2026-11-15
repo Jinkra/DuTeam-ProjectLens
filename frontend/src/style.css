@@ -136,6 +136,9 @@
 @media(prefers-reduced-motion:reduce){.assistant-message{animation:none}.assistant-thinking>button>i,.assistant-thinking>div i,.assistant-demo-thought i{animation:none}}
 .project-assistant-page{height:calc(100vh - 34px)}
 
+/* Workflow uploads */
+.knowledge-upload.uploading{cursor:progress;border-style:solid}.knowledge-upload>i{display:block;width:76%;height:4px;margin-top:7px;background:#dcebea;overflow:hidden}.knowledge-upload>i b{display:block;height:100%;background:#269b90;transition:width .12s linear}.knowledge-files span{padding-right:5px}.knowledge-files span>b{min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:500}.knowledge-files button{width:18px;height:18px;padding:0;border:0;border-radius:3px;background:transparent;color:#849397;display:grid;place-items:center;flex:none}.knowledge-files button:hover{background:#dbe7e6;color:#b34d4d}
+
 /* Workflow runtime edges */
 .studio-layout.workflow-running .vue-flow__edge-path{stroke:#536ce1;stroke-dasharray:9 7;animation:workflowEdgeFlow 1s linear infinite}.studio-layout.workflow-running .vue-flow__edge marker path{fill:#536ce1}@keyframes workflowEdgeFlow{to{stroke-dashoffset:-32}}
 
