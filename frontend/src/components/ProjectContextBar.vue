@@ -6,7 +6,7 @@ const tabs = [
   { id: 'workflow', label: '工作流', icon: Workflow },
   { id: 'review', label: '项目评审', icon: FileSearch },
   { id: 'analysis', label: '迭代分析', icon: BarChart3 },
-  { id: 'coach', label: 'AI 答辩教练', icon: Bot },
+  { id: 'coach', label: 'AI答辩教练', icon: Bot },
 ]
 </script>
 <template>

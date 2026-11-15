@@ -1,5 +1,5 @@
 const dimensions = [
-  ['aiDepth', 'AI 技术深度', 35],
+  ['aiDepth', 'AI技术深度', 35],
   ['innovation', '创新性', 25],
   ['engineering', '前端工程质量', 10],
   ['practicality', '实用性', 10],
@@ -24,18 +24,18 @@ function fallbackReview(project) {
   return {
     mode: 'fallback',
     total,
-    summary: '项目场景清晰，已经形成完整的评审闭环。当前最需要补强的是检索证据的可验证性，以及 Agent 工具调用过程的可视化。',
+    summary: '项目场景清晰，已经形成完整的评审闭环。当前最需要补强的是检索证据的可验证性，以及Agent工具调用过程的可视化。',
     dimensions: dimensions.map(([key, label, weight]) => ({ key, label, weight, score: score[key] })),
     findings: [
-      { level: 'high', title: 'RAG 证据链尚需量化验证', evidence: '材料提到了知识检索，但没有说明切分策略、召回指标和引用纠错机制。', action: '准备固定测试集，对比无 RAG 与启用 RAG 后的答案准确率和引用命中率。' },
-      { level: 'medium', title: 'Agent 决策过程可以更透明', evidence: '当前流程描述包含多个步骤，但用户难以确认每一步调用了什么工具。', action: '在评审页展示规划、检索、评分、核验四阶段及其输入输出摘要。' },
+      { level: 'high', title: 'RAG证据链尚需量化验证', evidence: '材料提到了知识检索，但没有说明切分策略、召回指标和引用纠错机制。', action: '准备固定测试集，对比无RAG与启用RAG后的答案准确率和引用命中率。' },
+      { level: 'medium', title: 'Agent决策过程可以更透明', evidence: '当前流程描述包含多个步骤，但用户难以确认每一步调用了什么工具。', action: '在评审页展示规划、检索、评分、核验四阶段及其输入输出摘要。' },
       { level: 'medium', title: '创新点需要形成可对比表述', evidence: '项目价值明确，但尚未与通用聊天助手或普通评分表工具形成直接对照。', action: '增加竞品对比：证据引用、局部重评、改进前后验证三个差异点。' },
     ],
     evidence: [
       { dimension: '实用性', quote: project.description || '面向大学生竞赛与课程项目提供智能评审。', source: '项目简介' },
-      { dimension: 'AI 技术深度', quote: project.material.slice(0, 110) || '尚未提供详细材料。', source: '项目材料' },
+      { dimension: 'AI技术深度', quote: project.material.slice(0, 110) || '尚未提供详细材料。', source: '项目材料' },
     ],
-    nextSteps: ['补充一组真实项目材料作为基准案例', '展示 Agent 工具调用时间线', '加入评分前后对比和局部重评'],
+    nextSteps: ['补充一组真实项目材料作为基准案例', '展示Agent工具调用时间线', '加入评分前后对比和局部重评'],
   }
 }
 
@@ -48,7 +48,7 @@ async function aiReview(project) {
       temperature: 0.2,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: '你是高校AI Web竞赛评审专家。仅输出JSON，字段必须为 total, summary, dimensions, findings, evidence, nextSteps。dimensions包含key,label,weight,score；findings包含level,title,evidence,action。所有判断必须引用材料，不得编造。' },
+        { role: 'system', content: '你是高校AI Web竞赛评审专家。仅输出JSON，字段必须为total, summary, dimensions, findings, evidence, nextSteps。dimensions包含key,label,weight,score；findings包含level,title,evidence,action。所有判断必须引用材料，不得编造。' },
         { role: 'user', content: JSON.stringify({ rubric: dimensions, project }) },
       ],
     }),

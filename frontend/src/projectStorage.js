@@ -1,14 +1,14 @@
 const projectDefaults = {
   workspace: [
-    { id: 'projectlens-demo', name: 'DuTeam ProjectLens', description: '面向大学生竞赛与课程项目的 AI 项目评审与改进 Agent', category: 'AI Agent 智能助手', status: '进行中', updatedAt: '2026-11-15T09:45:00.000Z', lastOpenedAt: '2026-11-15T09:45:00.000Z' },
+    { id: 'projectlens-demo', name: 'DuTeam ProjectLens', description: '面向大学生竞赛与课程项目的AI项目评审与改进Agent', category: 'AI Agent智能助手', status: '进行中', updatedAt: '2026-11-15T09:45:00.000Z', lastOpenedAt: '2026-11-15T09:45:00.000Z' },
   ],
   workflow: [
-    { id: 'wf-competition', name: '竞赛评审自动化', description: '材料读取、知识检索、AI 评审与报告输出', status: '草稿', updatedAt: '2026-11-15T09:30:00.000Z', lastOpenedAt: '2026-11-15T09:30:00.000Z' },
+    { id: 'wf-competition', name: '竞赛评审自动化', description: '材料读取、知识检索、AI评审与报告输出', status: '草稿', updatedAt: '2026-11-15T09:30:00.000Z', lastOpenedAt: '2026-11-15T09:30:00.000Z' },
     { id: 'wf-rubric', name: '评分标准核验流程', description: '根据竞赛规则核验评分证据与缺失材料', status: '已完成', updatedAt: '2026-11-12T14:20:00.000Z', lastOpenedAt: '2026-11-12T14:20:00.000Z' },
     { id: 'wf-defense', name: '答辩材料预审', description: '提取答辩重点并生成风险检查清单', status: '草稿', updatedAt: '2026-11-08T10:10:00.000Z', lastOpenedAt: '2026-11-08T10:10:00.000Z' },
   ],
   review: [
-    { id: 'rv-projectlens', name: 'ProjectLens 项目评审', description: 'AI 项目评审与改进 Agent 六维综合评审', status: '已完成', updatedAt: '2026-11-15T09:45:00.000Z', lastOpenedAt: '2026-11-15T09:45:00.000Z' },
+    { id: 'rv-projectlens', name: 'ProjectLens项目评审', description: 'AI项目评审与改进Agent六维综合评审', status: '已完成', updatedAt: '2026-11-15T09:45:00.000Z', lastOpenedAt: '2026-11-15T09:45:00.000Z' },
     { id: 'rv-course', name: '课程项目阶段评审', description: '课程设计完成度、工程质量与创新性评估', status: '进行中', updatedAt: '2026-11-13T16:30:00.000Z', lastOpenedAt: '2026-11-13T16:30:00.000Z' },
     { id: 'rv-innovation', name: '创新创业项目初评', description: '商业价值、可行性和展示材料完整度检查', status: '草稿', updatedAt: '2026-11-09T11:00:00.000Z', lastOpenedAt: '2026-11-09T11:00:00.000Z' },
   ],

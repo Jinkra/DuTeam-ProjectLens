@@ -66,7 +66,7 @@ async function consumeUsage(userId, requestedUnits = 1) {
     if (!user || user.status === 'suspended') return { error: user ? '账号已被暂停。' : '没有找到该用户。', status: user ? 403 : 404 }
     const usage = usageSnapshot(user)
     const exceeded = Object.keys(usage.used).find((key) => usage.used[key] + units > usage.limits[key])
-    if (exceeded) return { error: `当前 ${user.plan || 'free'} 套餐用量已达上限，请升级套餐或等待窗口重置。`, status: 429, usage }
+    if (exceeded) return { error: `当前${user.plan || 'free'}套餐用量已达上限，请升级套餐或等待窗口重置。`, status: 429, usage }
     const timestamp = new Date().toISOString()
     user.usageEvents = [...(user.usageEvents || []), ...Array.from({ length: units }, () => timestamp)]
     return { units, usage: usageSnapshot(user) }
@@ -95,7 +95,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, aiConfigured: Boolean
 
 app.post('/api/auth/register', async (req, res) => {
   const { name, email, password } = req.body
-  if (!name?.trim() || !email?.trim() || !password || password.length < 6) return res.status(400).json({ message: '请填写姓名、邮箱，并使用至少 6 位密码。' })
+  if (!name?.trim() || !email?.trim() || !password || password.length < 6) return res.status(400).json({ message: '请填写姓名、邮箱，并使用至少6位密码。' })
   const normalizedEmail = email.trim().toLowerCase()
   const result = await updateStore(async (data) => {
     if (data.users.some((user) => user.email === normalizedEmail)) return null
@@ -151,17 +151,17 @@ app.post('/api/usage/consume', requireAuth, async (req, res) => {
 })
 
 app.post('/api/assistant/chat', requireAuth, async (req, res) => {
-  const { project, question, messages, context } = req.body
+  const { project, question, messages, context, preferences } = req.body
   if (!project?.id || !project?.name || !question?.trim()) return res.status(400).json({ message: '请选择项目并输入问题。' })
-  if (question.trim().length > 2000) return res.status(400).json({ message: '单次提问不能超过 2000 字。' })
+  if (question.trim().length > 2000) return res.status(400).json({ message: '单次提问不能超过2000字。' })
   const consumed = await consumeUsage(req.user.sub)
   if (consumed.error) return res.status(consumed.status).json({ message: consumed.error, usage: consumed.usage })
   try {
-    const answer = await chatWithProject({ project, question: question.trim(), messages, context })
+    const answer = await chatWithProject({ project, question: question.trim(), messages, context, preferences })
     res.json({ ...answer, usage: consumed.usage })
   } catch (error) {
     console.error(error)
-    res.status(502).json({ message: 'AI 项目助手暂时无法回答，请稍后重试。' })
+    res.status(502).json({ message: 'AI项目助手暂时无法回答，请稍后重试。' })
   }
 })
 
@@ -206,7 +206,7 @@ app.post('/api/projects', requireAuth, async (req, res) => {
   const { name, category, description, material } = req.body
   if (!name?.trim() || !description?.trim()) return res.status(400).json({ message: '项目名称和简介不能为空。' })
   const project = await updateStore((data) => {
-    const item = { id: crypto.randomUUID(), userId: req.user.sub, name: name.trim(), category: category || 'AI Web 应用', description: description.trim(), material: material?.trim() || '', review: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+    const item = { id: crypto.randomUUID(), userId: req.user.sub, name: name.trim(), category: category || 'AI Web应用', description: description.trim(), material: material?.trim() || '', review: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
     data.projects.push(item)
     return item
   })
