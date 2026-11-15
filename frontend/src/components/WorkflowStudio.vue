@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Background, Controls, getBezierPath, Handle, MarkerType, MiniMap, Position, VueFlow } from '@xyflow/vue'
 import '@xyflow/vue/dist/style.css'
 import { Bot, Check, ChevronLeft, CircleStop, Database, Download, FileOutput, FileSearch, FolderOpen, Gauge, Play, Plus, Save, Settings2, Sparkles, Trash2, Upload } from 'lucide-vue-next'
@@ -12,6 +12,7 @@ defineEmits(['navigate', 'logout'])
 const running = ref(false)
 const runMessage = ref('准备就绪')
 const selectedNodeId = ref(null)
+const selectedEdgeId = ref(null)
 const nodeIndex = ref(6)
 const reportReady = ref(false)
 const exporting = ref(false)
@@ -23,6 +24,56 @@ const connectingSourceId = ref(null)
 const connectionSuggestions = ref([])
 const suggestedTargetIds = ref([])
 const draggingPalette = ref(null)
+const history = ref([])
+const draggingOrigin = ref(null)
+
+function cloneGraphValue(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+function rememberAction(action) {
+  history.value = [...history.value.slice(-39), cloneGraphValue(action)]
+}
+async function undoGraph() {
+  const action = history.value.at(-1)
+  if (!action || running.value) {
+    if (!action) runMessage.value = '没有可以撤回的操作'
+    return
+  }
+  history.value = history.value.slice(0, -1)
+  if (action.type === 'add-edge') flowInstance.value?.removeEdges([action.edge.id])
+  if (action.type === 'remove-edge' && !edges.value.some((edge) => edge.id === action.edge.id)) flowInstance.value?.addEdges([action.edge])
+  if (action.type === 'add-node') {
+    nodes.value = nodes.value.filter((node) => node.id !== action.node.id)
+    edges.value = edges.value.filter((edge) => edge.source !== action.node.id && edge.target !== action.node.id)
+  }
+  if (action.type === 'remove-node') {
+    if (!nodes.value.some((node) => node.id === action.node.id)) nodes.value = [...nodes.value, action.node]
+    const restoredEdges = action.edges.filter((edge) => !edges.value.some((current) => current.id === edge.id))
+    edges.value = [...edges.value, ...restoredEdges]
+  }
+  if (action.type === 'move-node') nodes.value = nodes.value.map((node) => node.id === action.nodeId ? { ...node, position: action.position } : node)
+  selectedNodeId.value = null
+  selectedEdgeId.value = null
+  runMessage.value = '已撤回上一步操作'
+  await nextTick()
+  flowInstance.value?.updateNodeInternals?.(nodes.value.map((node) => node.id))
+}
+function isEditableTarget(target) {
+  return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+}
+function handleWorkflowShortcut(event) {
+  if (isEditableTarget(event.target)) return
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+    event.preventDefault()
+    undoGraph()
+    return
+  }
+  if (event.key === 'Delete' || event.key === 'Backspace') {
+    if (!selectedEdgeId.value || running.value) return
+    event.preventDefault()
+    removeSelectedEdge()
+  }
+}
 
 function createConfig(type) {
   const common = { failureMode: 'stop', timeout: 60 }
@@ -86,7 +137,9 @@ function connectionReason(connection) {
 function isValidConnection(connection) { return !connectionReason(connection) }
 
 function onConnect(connection) {
-  flowInstance.value?.addEdges([{ id: `e-${Date.now()}`, ...connection, markerEnd: MarkerType.ArrowClosed }])
+  const edge = { id: `e-${Date.now()}`, ...connection, markerEnd: MarkerType.ArrowClosed }
+  flowInstance.value?.addEdges([edge])
+  rememberAction({ type: 'add-edge', edge })
   runMessage.value = '节点连接成功'
 }
 async function addNode(item, position = null) {
@@ -94,6 +147,7 @@ async function addNode(item, position = null) {
   const offset = (nodes.value.length % 3) * 26
   const node = { id, type: 'workflow', position: position || { x: 550 + offset, y: 390 + offset }, data: { label: item.label, kind: item.kind.toUpperCase(), type: item.kind, description: item.desc, status: 'idle', config: createConfig(item.kind) } }
   nodes.value = [...nodes.value, node]
+  rememberAction({ type: 'add-node', node })
   selectedNodeId.value = id
   runMessage.value = `已添加「${item.label}」，请在右侧完成配置`
   await nextTick()
@@ -175,9 +229,21 @@ function uploadInputFiles(event, target = 'files') {
 function removeSelected() {
   if (!selectedNode.value) return
   const id = selectedNode.value.id
+  const label = selectedNode.value.data.label
+  const removedEdges = edges.value.filter((edge) => edge.source === id || edge.target === id)
+  rememberAction({ type: 'remove-node', node: selectedNode.value, edges: removedEdges })
   nodes.value = nodes.value.filter((node) => node.id !== id)
   edges.value = edges.value.filter((edge) => edge.source !== id && edge.target !== id)
   selectedNodeId.value = null
+  runMessage.value = `已删除「${label}」· Ctrl+Z 可撤回`
+}
+function removeSelectedEdge() {
+  const edge = edges.value.find((item) => item.id === selectedEdgeId.value)
+  if (!edge) return
+  rememberAction({ type: 'remove-edge', edge })
+  flowInstance.value?.removeEdges([edge.id])
+  selectedEdgeId.value = null
+  runMessage.value = '已删除选中连线 · Ctrl+Z 可撤回'
 }
 function updateSelected() {
   if (!selectedNode.value) return
@@ -233,8 +299,8 @@ async function exportReport(automatic = false) {
     runMessage.value = `${automatic ? '自动导出' : '报告导出'}失败：${error.message}`
   } finally { exporting.value = false }
 }
-function onDragStart(event) { selectedNodeId.value = event.node.id; runMessage.value = `正在移动：${event.node.data.label}` }
-function onDragStop(event) { runMessage.value = `已更新「${event.node.data.label}」的位置` }
+function onDragStart(event) { draggingOrigin.value = { nodeId: event.node.id, position: cloneGraphValue(event.node.position) }; selectedNodeId.value = event.node.id; selectedEdgeId.value = null; runMessage.value = `正在移动：${event.node.data.label}` }
+function onDragStop(event) { if (draggingOrigin.value && (draggingOrigin.value.position.x !== event.node.position.x || draggingOrigin.value.position.y !== event.node.position.y)) rememberAction({ type: 'move-node', ...draggingOrigin.value }); draggingOrigin.value = null; runMessage.value = `已更新「${event.node.data.label}」的位置` }
 function onFlowInit(instance) {
   flowInstance.value = instance
   setTimeout(() => {
@@ -252,6 +318,8 @@ async function testSelectedNode() {
   nodes.value = nodes.value.map((node) => ({ ...node, data: { ...node.data, status: node.id === id ? 'completed' : node.data.status } }))
   runMessage.value = `节点测试通过：${selectedNode.value.data.label}`
 }
+onMounted(() => window.addEventListener('keydown', handleWorkflowShortcut))
+onBeforeUnmount(() => window.removeEventListener('keydown', handleWorkflowShortcut))
 </script>
 
 <template>
@@ -260,7 +328,7 @@ async function testSelectedNode() {
     <div class="workflow-toolbar"><button class="button button-ghost" @click="$emit('navigate', 'projects')"><ChevronLeft :size="16" />返回项目空间</button><div class="workflow-name"><strong>{{ project?.name || '项目工作流' }}</strong><span>草稿 · 自动保存开启</span></div><div class="toolbar-actions"><button v-if="reportReady" class="button report-button" :disabled="exporting" @click="exportReport()"><Download :size="16" />{{ exporting ? '生成 PDF...' : '导出评审报告' }}</button><button class="button button-ghost" @click="saveWorkflow"><Save :size="16" />保存</button><button class="button button-primary" :disabled="running" @click="runWorkflow"><CircleStop v-if="running" :size="16" /><Play v-else :size="16" />{{ running ? '运行中' : '运行工作流' }}</button></div></div>
     <div class="studio-layout" :class="{ 'inspector-open': selectedNode }">
       <aside class="node-library"><div class="library-heading"><div><h3>节点库</h3><p>拖拽到画布，或点击添加</p></div><Plus :size="18" /></div><label class="node-search"><FileSearch :size="15" /><input v-model="nodeQuery" placeholder="搜索节点" /></label><div class="node-group"><p>基础节点</p><button v-for="item in filteredPalette" :key="item.label" draggable="true" @dragstart="onPaletteDragStart($event, item)" @dragend="draggingPalette = null" @click="addNode(item)"><span :class="item.kind"><component :is="item.icon" :size="17" /></span><div><strong>{{ item.label }}</strong><small>{{ item.desc }}</small></div><Plus :size="14" /></button><div v-if="!filteredPalette.length" class="node-search-empty">没有匹配的节点</div></div><div class="template-callout"><Sparkles :size="17" /><strong>从模板开始</strong><p>使用经过验证的评审流程快速搭建。</p><button>浏览模板</button></div></aside>
-      <main ref="flowCanvasRef" class="flow-canvas" @dragover="onCanvasDragOver" @drop="onCanvasDrop"><div class="canvas-status" :class="{ live: running, warning: runMessage.startsWith('无法连接') || runMessage.includes('失败') }"><i></i>{{ runMessage }}</div><VueFlow v-model:nodes="nodes" v-model:edges="edges" :default-viewport="{ zoom: 0.82 }" :fit-view-options="{ padding: 0.16 }" :min-zoom="0.35" :max-zoom="1.8" :is-valid-connection="isValidConnection" :connection-radius="28" :pan-on-drag="[1, 2]" fit-view-on-init @init="onFlowInit" @move="connectionActive && refreshConnectionSuggestions()" @connect="onConnect" @connect-start="onConnectStart" @connect-end="onConnectEnd" @node-click="selectedNodeId = $event.node.id" @pane-click="selectedNodeId = null" @node-drag-start="onDragStart" @node-drag-stop="onDragStop"><Background pattern-color="#dce1e9" :gap="24" :size="1" /><template #connection-line="{ fromX, fromY, fromPosition, toX, toY, toPosition }"><path :d="getBezierPath({ sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition })[0]" class="connection-preview" :class="{ active: connectionActive }" /></template><template #node-workflow="{ data, id }"><div class="premium-node" :class="[data.type, data.status, { 'suggested-target': suggestedTargetIds.includes(id) }]"><Handle type="target" :position="Position.Left" /><div class="premium-node-top"><span class="premium-node-icon"><Upload v-if="data.type === 'input'" :size="16" /><Database v-else-if="data.type === 'knowledge'" :size="16" /><Bot v-else-if="data.type === 'agent'" :size="16" /><FileSearch v-else-if="data.type === 'process'" :size="16" /><FileOutput v-else :size="16" /></span><small>{{ data.kind }}</small><i v-if="data.status === 'completed'"><Check :size="12" /></i><i v-else-if="data.status === 'running'" class="node-spinner"></i></div><strong>{{ data.label }}</strong><p>{{ data.description }}</p><div class="premium-node-meta"><span>{{ data.type === 'agent' || data.type === 'process' ? `${data.config.model} · ${data.config.usageMultiplier}x` : data.type === 'knowledge' ? `${data.config.files.length} 个文件` : data.type === 'input' ? `${(data.config.files?.length || 0) + (data.config.folderFiles?.length || 0)} 个材料` : '已配置' }}</span><em></em></div><Handle type="source" :position="Position.Right" /></div></template><Controls /><MiniMap pannable zoomable /></VueFlow><svg v-if="connectionSuggestions.length" class="connection-suggestions" aria-hidden="true"><path v-for="item in connectionSuggestions" :key="item.targetId" :d="item.path" class="connection-suggestion-path" /></svg><div class="canvas-guide"><span>中键/右键平移</span><span>滚轮缩放</span><span>左键从端点连接</span></div></main>
+      <main ref="flowCanvasRef" class="flow-canvas" @dragover="onCanvasDragOver" @drop="onCanvasDrop"><div class="canvas-status" :class="{ live: running, warning: runMessage.startsWith('无法连接') || runMessage.includes('失败') }"><i></i>{{ runMessage }}</div><VueFlow v-model:nodes="nodes" v-model:edges="edges" :default-viewport="{ zoom: 0.82 }" :fit-view-options="{ padding: 0.16 }" :min-zoom="0.35" :max-zoom="1.8" :is-valid-connection="isValidConnection" :connection-radius="28" :delete-key-code="[]" :pan-on-drag="[1, 2]" fit-view-on-init @init="onFlowInit" @move="connectionActive && refreshConnectionSuggestions()" @connect="onConnect" @connect-start="onConnectStart" @connect-end="onConnectEnd" @edge-click="selectedEdgeId = $event.edge.id; selectedNodeId = null" @node-click="selectedNodeId = $event.node.id; selectedEdgeId = null" @pane-click="selectedNodeId = null; selectedEdgeId = null" @node-drag-start="onDragStart" @node-drag-stop="onDragStop"><Background pattern-color="#dce1e9" :gap="24" :size="1" /><template #connection-line="{ fromX, fromY, fromPosition, toX, toY, toPosition }"><path :d="getBezierPath({ sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition })[0]" class="connection-preview" :class="{ active: connectionActive }" /></template><template #node-workflow="{ data, id }"><div class="premium-node" :class="[data.type, data.status, { 'suggested-target': suggestedTargetIds.includes(id) }]"><Handle type="target" :position="Position.Left" /><div class="premium-node-top"><span class="premium-node-icon"><Upload v-if="data.type === 'input'" :size="16" /><Database v-else-if="data.type === 'knowledge'" :size="16" /><Bot v-else-if="data.type === 'agent'" :size="16" /><FileSearch v-else-if="data.type === 'process'" :size="16" /><FileOutput v-else :size="16" /></span><small>{{ data.kind }}</small><i v-if="data.status === 'completed'"><Check :size="12" /></i><i v-else-if="data.status === 'running'" class="node-spinner"></i></div><strong>{{ data.label }}</strong><p>{{ data.description }}</p><div class="premium-node-meta"><span>{{ data.type === 'agent' || data.type === 'process' ? `${data.config.model} · ${data.config.usageMultiplier}x` : data.type === 'knowledge' ? `${data.config.files.length} 个文件` : data.type === 'input' ? `${(data.config.files?.length || 0) + (data.config.folderFiles?.length || 0)} 个材料` : '已配置' }}</span><em></em></div><Handle type="source" :position="Position.Right" /></div></template><Controls /><MiniMap pannable zoomable /></VueFlow><svg v-if="connectionSuggestions.length" class="connection-suggestions" aria-hidden="true"><path v-for="item in connectionSuggestions" :key="item.targetId" :d="item.path" class="connection-suggestion-path" /></svg><div class="canvas-guide"><span>中键/右键平移</span><span>滚轮缩放</span><span>左键从端点连接</span><span>Delete 删除选中连线</span><span>Ctrl+Z 撤回</span></div></main>
       <aside class="node-inspector"><template v-if="selectedNode"><div class="inspector-heading"><div><span><Settings2 :size="17" /></span><div><h3>{{ selectedNode.data.label }}</h3><p>{{ selectedNode.data.kind }} · NODE {{ selectedNode.id.padStart(2, '0') }}</p></div></div><button class="icon-button danger" title="删除节点" @click="removeSelected"><Trash2 :size="16" /></button></div><div class="node-fixed-summary"><p>{{ selectedNode.data.description }}</p><span>节点名称与类型由工作流定义，不可修改</span></div>
         <div v-if="selectedNode.data.type === 'input'" class="node-config-fields"><h4>材料输入</h4><label>输入方式<select v-model="selectedNode.data.config.sourceMode" @change="updateSelected"><option value="files">上传文件</option><option value="folder">选择项目目录</option><option value="url">仓库地址</option></select></label><template v-if="selectedNode.data.config.sourceMode === 'files'"><label class="knowledge-upload"><Upload :size="17" /><strong>上传项目材料</strong><small>支持多个方案文档、截图与说明文件</small><input type="file" multiple accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg,.webp" @change="uploadInputFiles($event, 'files')" /></label><div v-if="selectedNode.data.config.files?.length" class="knowledge-files"><span v-for="file in selectedNode.data.config.files" :key="file"><FolderOpen :size="13" />{{ file }}</span></div></template><template v-else-if="selectedNode.data.config.sourceMode === 'folder'"><label class="knowledge-upload"><FolderOpen :size="17" /><strong>选择项目目录</strong><small>将读取目录内的项目材料与代码文件</small><input type="file" webkitdirectory directory multiple @change="uploadInputFiles($event, 'folderFiles')" /></label><div v-if="selectedNode.data.config.folderFiles?.length" class="knowledge-files"><span v-for="file in selectedNode.data.config.folderFiles" :key="file"><FolderOpen :size="13" />{{ file }}</span></div></template><label v-else>仓库地址<input v-model.trim="selectedNode.data.config.repositoryUrl" type="url" placeholder="https://github.com/owner/repository" @input="updateSelected" /></label><label>支持格式<input :value="selectedNode.data.config.acceptedTypes" readonly /></label><label class="config-toggle"><input v-model="selectedNode.data.config.parseImages" type="checkbox" @change="updateSelected" /><span>解析材料中的截图与图片</span></label></div>
         <div v-else-if="selectedNode.data.type === 'knowledge'" class="node-config-fields"><h4>知识库配置</h4><label class="knowledge-upload"><Upload :size="17" /><strong>上传知识库文件</strong><small>PDF、DOCX、TXT、Markdown</small><input type="file" multiple accept=".pdf,.doc,.docx,.txt,.md" @change="uploadKnowledgeFiles" /></label><div v-if="selectedNode.data.config.files.length" class="knowledge-files"><span v-for="file in selectedNode.data.config.files" :key="file"><FolderOpen :size="13" />{{ file }}</span></div><label>检索方式<select v-model="selectedNode.data.config.retrievalMode" @change="updateSelected"><option value="hybrid">混合检索</option><option value="vector">向量检索</option><option value="keyword">关键词检索</option></select></label><label>召回数量<div class="input-suffix"><input v-model.number="selectedNode.data.config.topK" type="number" min="1" max="30" @input="updateSelected" /><span>条</span></div></label><label class="config-toggle"><input v-model="selectedNode.data.config.rerank" type="checkbox" @change="updateSelected" /><span>启用结果重排序</span></label></div>
