@@ -59,11 +59,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <PortalPage v-if="page === 'portal'" :user="user" @auth="openAuth" @navigate="navigate" />
-  <ToolHub v-else-if="page === 'tools'" :user="user" @navigate="navigate" @logout="logout" />
-  <WorkflowStudio v-else-if="page === 'workflow'" :user="user" @navigate="navigate" @logout="logout" />
-  <ReviewTool v-else-if="page === 'review'" :user="user" @navigate="navigate" @logout="logout" />
-  <SubscriptionPage v-else-if="page === 'pricing'" :user="user" @navigate="navigate" @logout="logout" @auth="openAuth" />
-  <AdminPage v-else-if="page === 'admin'" :user="user" @navigate="navigate" @logout="logout" @authenticated="authenticated" />
+  <Transition name="page-transition" mode="out-in">
+    <div :key="page" class="app-page">
+      <PortalPage v-if="page === 'portal'" :user="user" @auth="openAuth" @navigate="navigate" />
+      <ToolHub v-else-if="page === 'tools'" :user="user" @navigate="navigate" @logout="logout" />
+      <WorkflowStudio v-else-if="page === 'workflow'" :user="user" @navigate="navigate" @logout="logout" />
+      <ReviewTool v-else-if="page === 'review'" :user="user" @navigate="navigate" @logout="logout" />
+      <SubscriptionPage v-else-if="page === 'pricing'" :user="user" @navigate="navigate" @logout="logout" @auth="openAuth" />
+      <AdminPage v-else-if="page === 'admin'" :user="user" @navigate="navigate" @logout="logout" @authenticated="authenticated" />
+    </div>
+  </Transition>
   <AuthModal v-if="authOpen" :initial-mode="authMode" @close="authOpen = false" @authenticated="authenticated" />
 </template>
