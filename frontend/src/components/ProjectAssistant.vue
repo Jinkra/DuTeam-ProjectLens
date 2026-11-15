@@ -25,8 +25,8 @@ let requestController = null
 let elapsedTimer = null
 
 const quickPrompts = [
+  { icon: FileText, text: '总结最近一次工作流分析报告' },
   { icon: Lightbulb, text: '找出当前项目最需要改进的三点' },
-  { icon: FileText, text: '根据项目资料整理核心亮点' },
   { icon: MessageSquareText, text: '模拟评委追问并组织回答' },
 ]
 const modes = ['项目问答', '材料分析', '答辩准备']
@@ -45,14 +45,15 @@ const projectContext = computed(() => {
     return {
       materials: [...new Set([...materials, ...attachments.value])],
       workflowNodes: nodes.map((node) => `${node.data?.label || node.id}：${node.data?.description || ''}`),
+      workflowReport: workflow?.latestReport || null,
     }
-  } catch { return { materials: [...attachments.value], workflowNodes: [] } }
+  } catch { return { materials: [...attachments.value], workflowNodes: [], workflowReport: null } }
 })
-const contextCount = computed(() => 1 + projectContext.value.materials.length + projectContext.value.workflowNodes.length)
+const contextCount = computed(() => 1 + projectContext.value.materials.length + projectContext.value.workflowNodes.length + (projectContext.value.workflowReport ? 1 : 0))
 const thinkingSteps = computed(() => [
   '读取项目概况与当前问题',
   projectContext.value.materials.length ? `检索${projectContext.value.materials.length}项材料索引` : '检查项目材料索引',
-  effort.value === '深度分析' ? '交叉核验工作流与评审证据' : '组织项目针对性回答',
+  projectContext.value.workflowReport ? '读取工作流分析报告与评分结论' : effort.value === '深度分析' ? '交叉核验工作流与评审证据' : '组织项目针对性回答',
 ])
 
 function loadMessages() {
@@ -122,7 +123,7 @@ onBeforeUnmount(stopTimer)
           <div><p class="kicker">PROJECT COMPANION</p><h2>Duts项目助手</h2><span><i></i>已连接当前项目</span></div>
         </div>
         <section class="assistant-project-card"><small>当前知识库</small><strong>{{ project?.name }}</strong><p>{{ project?.description }}</p><div><span>{{ project?.category }}</span><em>{{ contextCount }}项上下文</em></div></section>
-        <section class="context-sources"><header><div><h3>已读取内容</h3><p>对话会自动参考这些信息</p></div><Check :size="16" /></header><ul><li><span><FileText :size="15" /></span><div><strong>项目简介</strong><small>名称、方向、状态和描述</small></div></li><li><span><Paperclip :size="15" /></span><div><strong>项目材料</strong><small>{{ projectContext.materials.length ? `${projectContext.materials.length}个文件索引` : '暂未上传材料' }}</small></div></li><li><span><Sparkles :size="15" /></span><div><strong>工作流配置</strong><small>{{ projectContext.workflowNodes.length ? `${projectContext.workflowNodes.length}个节点` : '使用默认项目上下文' }}</small></div></li></ul></section>
+        <section class="context-sources"><header><div><h3>已读取内容</h3><p>对话会自动参考这些信息</p></div><Check :size="16" /></header><ul><li><span><FileText :size="15" /></span><div><strong>项目简介</strong><small>名称、方向、状态和描述</small></div></li><li><span><Paperclip :size="15" /></span><div><strong>项目材料</strong><small>{{ projectContext.materials.length ? `${projectContext.materials.length}个文件索引` : '暂未上传材料' }}</small></div></li><li><span><Sparkles :size="15" /></span><div><strong>工作流配置</strong><small>{{ projectContext.workflowNodes.length ? `${projectContext.workflowNodes.length}个节点` : '使用默认项目上下文' }}</small></div></li><li><span><FileText :size="15" /></span><div><strong>工作流分析报告</strong><small>{{ projectContext.workflowReport ? `${projectContext.workflowReport.total}分 · ${projectContext.workflowReport.generatedAt}` : '运行工作流后自动同步' }}</small></div></li></ul></section>
         <button class="assistant-reset" @click="resetChat"><RotateCcw :size="15" />清空本项目对话</button>
       </aside>
 

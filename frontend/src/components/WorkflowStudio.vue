@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Background, Controls, getBezierPath, Handle, MarkerType, MiniMap, Position, VueFlow } from '@xyflow/vue'
 import '@xyflow/vue/dist/style.css'
 import { Bot, Check, ChevronLeft, CircleStop, Database, Download, FileOutput, FileSearch, FolderOpen, Gauge, Play, Plus, Save, Settings2, Sparkles, Trash2, Upload, X } from 'lucide-vue-next'
@@ -16,7 +16,9 @@ const selectedEdgeId = ref(null)
 const nodeIndex = ref(6)
 const reportReady = ref(false)
 const reviewResult = ref(null)
+const latestReport = ref(null)
 const exporting = ref(false)
+const autoSaveState = ref('自动保存已开启')
 const nodeQuery = ref('')
 const flowInstance = ref(null)
 const flowCanvasRef = ref(null)
@@ -30,6 +32,8 @@ const draggingOrigin = ref(null)
 const uploadProgress = ref(0)
 const uploadingNodeId = ref(null)
 let restoredViewport = null
+let autoSaveTimer = null
+let workflowReady = false
 
 function cloneGraphValue(value) {
   return JSON.parse(JSON.stringify(value))
@@ -117,6 +121,9 @@ function restoreWorkflow() {
     nodes.value = saved.nodes.map((node) => ({ ...node, data: { ...node.data, status: 'idle' } }))
     edges.value = saved.edges.map((edge) => ({ ...edge, animated: false }))
     restoredViewport = saved.viewport || null
+    latestReport.value = saved.latestReport || null
+    reviewResult.value = saved.reviewResult || null
+    reportReady.value = Boolean(latestReport.value && reviewResult.value)
     nodeIndex.value = Math.max(0, ...nodes.value.map((node) => Number(node.id) || 0)) + 1
     history.value = []
     runMessage.value = saved.savedAt
@@ -322,7 +329,9 @@ async function runWorkflow() {
     reviewResult.value = await api('/reviews/analyze', { method: 'POST', body: JSON.stringify({ project: { name: props.project?.name || '未命名项目', category: props.project?.category, description: props.project?.description, material: materials.length ? `已上传材料：${materials.join('、')}` : props.project?.description || '' } }) })
     const modeLabel = reviewResult.value.mode === 'ai' ? '模型智能评审' : '规则辅助评审'
     runMessage.value = `运行完成 · ${nodes.value.length}个节点 · ${duration}s · ${modeLabel}`
+    latestReport.value = buildReport()
     reportReady.value = true
+    saveWorkflow({ automatic: true, silent: true })
     await exportReport(true)
   } catch (error) {
     runMessage.value = `评审分析失败：${error.message}`
@@ -331,8 +340,22 @@ async function runWorkflow() {
 async function exportReport(automatic = false) {
   if (exporting.value || !reviewResult.value) return
   exporting.value = true
+  const report = latestReport.value || buildReport()
+  latestReport.value = report
+  try {
+    const { exportReviewPdf } = await import('../reportPdf')
+    await exportReviewPdf(report)
+    const outputNode = nodes.value.find((node) => node.data.type === 'output')
+    const exportPath = outputNode?.data.config.exportPath || '浏览器下载目录/ProjectLens'
+    runMessage.value = `评审报告导出成功 · 已导出到${exportPath}`
+  } catch (error) {
+    runMessage.value = `${automatic ? '自动导出' : '报告导出'}失败：${error.message}`
+  } finally { exporting.value = false }
+}
+function buildReport() {
   const result = reviewResult.value
-  const report = {
+  if (!result) return null
+  return {
     id: `PL-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`,
     projectName: props.project?.name || '未命名项目',
     title: `${props.project?.name || '未命名项目'}评审报告`,
@@ -344,15 +367,6 @@ async function exportReport(automatic = false) {
     findings: result.findings,
     nodes: nodes.value.map((node) => ({ name: node.data.label, type: node.data.kind, status: node.data.status, description: node.data.description })),
   }
-  try {
-    const { exportReviewPdf } = await import('../reportPdf')
-    await exportReviewPdf(report)
-    const outputNode = nodes.value.find((node) => node.data.type === 'output')
-    const exportPath = outputNode?.data.config.exportPath || '浏览器下载目录/ProjectLens'
-    runMessage.value = `评审报告导出成功 · 已导出到${exportPath}`
-  } catch (error) {
-    runMessage.value = `${automatic ? '自动导出' : '报告导出'}失败：${error.message}`
-  } finally { exporting.value = false }
 }
 function onDragStart(event) { draggingOrigin.value = { nodeId: event.node.id, position: cloneGraphValue(event.node.position) }; selectedNodeId.value = event.node.id; selectedEdgeId.value = null; runMessage.value = `正在移动：${event.node.data.label}` }
 function onDragStop(event) { if (draggingOrigin.value && (draggingOrigin.value.position.x !== event.node.position.x || draggingOrigin.value.position.y !== event.node.position.y)) rememberAction({ type: 'move-node', ...draggingOrigin.value }); draggingOrigin.value = null; runMessage.value = `已更新「${event.node.data.label}」的位置` }
@@ -364,7 +378,7 @@ function onFlowInit(instance) {
     else instance.fitView({ padding: 0.12, duration: 260 })
   }, 80)
 }
-function saveWorkflow() {
+function saveWorkflow(options = {}) {
   try {
     const savedAt = new Date()
     window.localStorage.setItem(workflowStorageKey(), JSON.stringify({
@@ -372,12 +386,22 @@ function saveWorkflow() {
       nodes: cloneGraphValue(nodes.value),
       edges: cloneGraphValue(edges.value),
       viewport: flowInstance.value?.getViewport?.() || null,
+      reviewResult: cloneGraphValue(reviewResult.value),
+      latestReport: cloneGraphValue(latestReport.value),
       savedAt: savedAt.toISOString(),
     }))
-    runMessage.value = `已保存 · ${savedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+    autoSaveState.value = `已自动保存 ${savedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+    if (!options.silent && !options.automatic) runMessage.value = `已保存 · ${savedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
   } catch (error) {
-    runMessage.value = `保存失败：${error.message}`
+    autoSaveState.value = '自动保存失败'
+    if (!options.silent) runMessage.value = `保存失败：${error.message}`
   }
+}
+function scheduleAutoSave() {
+  if (!workflowReady) return
+  autoSaveState.value = '正在自动保存...'
+  window.clearTimeout(autoSaveTimer)
+  autoSaveTimer = window.setTimeout(() => saveWorkflow({ automatic: true, silent: true }), 500)
 }
 async function testSelectedNode() {
   if (!selectedNode.value || running.value) return
@@ -388,14 +412,15 @@ async function testSelectedNode() {
   nodes.value = nodes.value.map((node) => ({ ...node, data: { ...node.data, status: node.id === id ? 'completed' : node.data.status } }))
   runMessage.value = `节点测试通过：${selectedNode.value.data.label}`
 }
-onMounted(() => window.addEventListener('keydown', handleWorkflowShortcut))
-onBeforeUnmount(() => window.removeEventListener('keydown', handleWorkflowShortcut))
+watch([nodes, edges], scheduleAutoSave, { deep: true })
+onMounted(() => { workflowReady = true; window.addEventListener('keydown', handleWorkflowShortcut) })
+onBeforeUnmount(() => { window.clearTimeout(autoSaveTimer); if (workflowReady) saveWorkflow({ automatic: true, silent: true }); window.removeEventListener('keydown', handleWorkflowShortcut) })
 </script>
 
 <template>
   <component :is="embedded ? 'div' : AppShell" v-bind="embedded ? {} : { user, active: 'workflow', title: '工作流工作台', subtitle: '竞赛项目自动评审与流程编排', full: true }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
     <ProjectContextBar :project="project" active="workflow" @navigate="$emit('navigate', $event)" />
-    <div class="workflow-toolbar"><button class="button button-ghost" @click="$emit('navigate', 'projects')"><ChevronLeft :size="16" />返回项目空间</button><div class="workflow-name"><strong>{{ project?.name || '项目工作流' }}</strong><span>项目工作流 · 更改后请保存</span></div><div class="toolbar-actions"><button v-if="reportReady" class="button report-button" :disabled="exporting" @click="exportReport()"><Download :size="16" />{{ exporting ? '生成PDF...' : '导出评审报告' }}</button><button class="button button-ghost" @click="saveWorkflow"><Save :size="16" />保存</button><button class="button button-primary" :disabled="running" @click="runWorkflow"><CircleStop v-if="running" :size="16" /><Play v-else :size="16" />{{ running ? '运行中' : '运行工作流' }}</button></div></div>
+    <div class="workflow-toolbar"><button class="button button-ghost" @click="$emit('navigate', 'projects')"><ChevronLeft :size="16" />返回项目空间</button><div class="workflow-name"><strong>{{ project?.name || '项目工作流' }}</strong><span>项目工作流 · {{ autoSaveState }}</span></div><div class="toolbar-actions"><button v-if="reportReady" class="button report-button" :disabled="exporting" @click="exportReport()"><Download :size="16" />{{ exporting ? '生成PDF...' : '导出评审报告' }}</button><button class="button button-ghost" @click="saveWorkflow()"><Save :size="16" />立即保存</button><button class="button button-primary" :disabled="running" @click="runWorkflow"><CircleStop v-if="running" :size="16" /><Play v-else :size="16" />{{ running ? '运行中' : '运行工作流' }}</button></div></div>
     <div class="studio-layout" :class="{ 'inspector-open': selectedNode, 'workflow-running': running }">
       <aside class="node-library"><div class="library-heading"><div><h3>节点库</h3><p>拖拽到画布，或点击添加</p></div><Plus :size="18" /></div><label class="node-search"><FileSearch :size="15" /><input v-model="nodeQuery" placeholder="搜索节点" /></label><div class="node-group"><p>基础节点</p><button v-for="item in filteredPalette" :key="item.label" draggable="true" @dragstart="onPaletteDragStart($event, item)" @dragend="draggingPalette = null" @click="addNode(item)"><span :class="item.kind"><component :is="item.icon" :size="17" /></span><div><strong>{{ item.label }}</strong><small>{{ item.desc }}</small></div><Plus :size="14" /></button><div v-if="!filteredPalette.length" class="node-search-empty">没有匹配的节点</div></div><div class="template-callout"><Sparkles :size="17" /><strong>从模板开始</strong><p>使用经过验证的评审流程快速搭建。</p><button>浏览模板</button></div></aside>
       <main ref="flowCanvasRef" class="flow-canvas" @dragover="onCanvasDragOver" @drop="onCanvasDrop"><div class="canvas-status" :class="{ live: running, warning: runMessage.startsWith('无法连接') || runMessage.includes('失败') }"><i></i>{{ runMessage }}</div><VueFlow v-model:nodes="nodes" v-model:edges="edges" :default-viewport="{ zoom: 0.82 }" :fit-view-options="{ padding: 0.16 }" :min-zoom="0.35" :max-zoom="1.8" :is-valid-connection="isValidConnection" :connection-radius="28" :delete-key-code="[]" :pan-on-drag="[1, 2]" fit-view-on-init @init="onFlowInit" @move="connectionActive && refreshConnectionSuggestions()" @connect="onConnect" @connect-start="onConnectStart" @connect-end="onConnectEnd" @edge-click="selectedEdgeId = $event.edge.id; selectedNodeId = null" @node-click="selectedNodeId = $event.node.id; selectedEdgeId = null" @pane-click="selectedNodeId = null; selectedEdgeId = null" @node-drag-start="onDragStart" @node-drag-stop="onDragStop"><Background pattern-color="#dce1e9" :gap="24" :size="1" /><template #connection-line="{ fromX, fromY, fromPosition, toX, toY, toPosition }"><path :d="getBezierPath({ sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition })[0]" class="connection-preview" :class="{ active: connectionActive }" /></template><template #node-workflow="{ data, id }"><div class="premium-node" :class="[data.type, data.status, { 'suggested-target': suggestedTargetIds.includes(id) }]"><Handle type="target" :position="Position.Left" /><div class="premium-node-top"><span class="premium-node-icon"><Upload v-if="data.type === 'input'" :size="16" /><Database v-else-if="data.type === 'knowledge'" :size="16" /><Bot v-else-if="data.type === 'agent'" :size="16" /><FileSearch v-else-if="data.type === 'process'" :size="16" /><FileOutput v-else :size="16" /></span><small>{{ data.kind }}</small><i v-if="data.status === 'completed'"><Check :size="12" /></i><i v-else-if="data.status === 'running'" class="node-spinner"></i></div><strong>{{ data.label }}</strong><p>{{ data.description }}</p><div class="premium-node-meta"><span>{{ data.type === 'agent' || data.type === 'process' ? `${data.config.model} · ${data.config.usageMultiplier}x` : data.type === 'knowledge' ? `${data.config.files.length}个文件` : data.type === 'input' ? `${(data.config.files?.length || 0) + (data.config.folderFiles?.length || 0)}个材料` : '已配置' }}</span><em></em></div><Handle type="source" :position="Position.Right" /></div></template><Controls /><MiniMap pannable zoomable /></VueFlow><svg v-if="connectionSuggestions.length" class="connection-suggestions" aria-hidden="true"><path v-for="item in connectionSuggestions" :key="item.targetId" :d="item.path" class="connection-suggestion-path" /></svg><div class="canvas-guide"><span>中键/右键平移</span><span>滚轮缩放</span><span>左键从端点连接</span><span>Delete删除选中连线</span><span>Ctrl+Z撤回</span></div></main>

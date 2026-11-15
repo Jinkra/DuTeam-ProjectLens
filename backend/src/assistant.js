@@ -1,7 +1,11 @@
 function fallbackAnswer(project, question, context) {
   const name = project?.name || '当前项目'
   const materials = context?.materials?.length ? `我已读取到${context.materials.length}项材料索引：${context.materials.slice(0, 4).join('、')}。` : '当前项目还没有可引用的材料文件，回答主要依据项目简介。'
-  const focus = question.includes('答辩')
+  const report = context?.workflowReport
+  const reportSummary = report ? `最近一次工作流分析报告综合评分为${report.total}分，结论为：${report.summary}` : ''
+  const focus = (question.includes('报告') || question.includes('评分')) && report
+    ? `${reportSummary}。主要改进项包括：${(report.findings || []).slice(0, 3).map((item) => `${item.title}（${item.action}）`).join('；') || '暂无明确改进项'}。`
+    : question.includes('答辩')
     ? '建议先用“问题背景、核心方案、量化证据、风险与下一步”五段结构组织回答，并为每个结论准备一条项目材料依据。'
     : question.includes('改进') || question.includes('优化')
       ? '建议优先补齐可验证指标、真实使用案例和结论到证据的映射，再处理展示层面的优化。'
@@ -10,6 +14,7 @@ function fallbackAnswer(project, question, context) {
     content: `关于「${name}」：${materials}${focus}`,
     citations: [
       { label: '项目简介', detail: project?.description || '暂无项目简介' },
+      ...(report ? [{ label: '工作流分析报告', detail: `${report.title || '评审报告'} · ${report.total}分` }] : []),
       ...(context?.materials || []).slice(0, 2).map((item) => ({ label: '项目材料', detail: item })),
     ],
     mode: 'fallback',
@@ -26,6 +31,15 @@ export async function chatWithProject({ project, question, messages = [], contex
     status: project?.status,
     materials: (context.materials || []).slice(0, 30),
     workflowNodes: (context.workflowNodes || []).slice(0, 20),
+    workflowReport: context.workflowReport ? {
+      title: context.workflowReport.title,
+      generatedAt: context.workflowReport.generatedAt,
+      analysisMode: context.workflowReport.analysisMode,
+      total: context.workflowReport.total,
+      summary: context.workflowReport.summary,
+      dimensions: (context.workflowReport.dimensions || []).slice(0, 10),
+      findings: (context.workflowReport.findings || []).slice(0, 10),
+    } : null,
   }, null, 2)
   const response = await fetch(`${process.env.AI_BASE_URL || 'https://api.openai.com/v1'}/chat/completions`, {
     method: 'POST',
@@ -46,6 +60,7 @@ export async function chatWithProject({ project, question, messages = [], contex
     content: data.choices?.[0]?.message?.content || '没有获得有效回答，请换一种方式提问。',
     citations: [
       { label: '项目简介', detail: project?.description || '暂无项目简介' },
+      ...(context.workflowReport ? [{ label: '工作流分析报告', detail: `${context.workflowReport.title || '评审报告'} · ${context.workflowReport.total}分` }] : []),
       ...(context.materials || []).slice(0, 3).map((item) => ({ label: '项目材料', detail: item })),
     ],
     mode: 'ai',
