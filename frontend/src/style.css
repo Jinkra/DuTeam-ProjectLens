@@ -100,7 +100,7 @@
 .console-full .console-content-page{min-height:0;height:calc(100vh - 34px);display:flex;flex:none;flex-direction:column}.console-full .project-context-bar{position:relative;top:auto;flex:none;z-index:12}.console-full .workflow-toolbar{position:relative;flex:none;z-index:11}.console-full .studio-layout{height:calc(100vh - 156px);min-height:0;flex:none;overflow:hidden}
 
 /* Project tools share the compact project-first header used by workflow. */
-.console-project-tool .console-header{display:none}.console-project-tool .project-context-bar{position:relative;top:auto}
+.console-project-tool .console-header{display:none}.console-project-tool .console-content-page>.project-tool-view{width:100%;max-width:none;margin:0;padding:0}.console-project-tool .project-tool-view>.project-context-bar{position:relative;top:auto;width:100%;max-width:none;margin:0}
 
 /* Workflow connection guidance and portal operations */
 .connection-suggestions{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:visible}.connection-suggestion-path{fill:none;stroke:#62a9a3;stroke-width:1.5;stroke-linecap:round;stroke-dasharray:7 9;opacity:.3;animation:suggestionPulse 1.8s ease-in-out infinite}.premium-node.suggested-target{border-color:#86c6c0;box-shadow:0 0 0 4px rgba(74,160,151,.08),0 14px 30px rgba(34,44,68,.1)}.filing-links svg{color:#168f87;flex:none}.admin-entry{color:#445b62;border-color:#d7e1e2;background:#f8fbfb}.admin-entry:hover{color:#147f78;border-color:#aed3cf;background:#eff8f7}@keyframes suggestionPulse{0%,100%{opacity:.16;stroke-dashoffset:0}50%{opacity:.55;stroke-dashoffset:-16}}

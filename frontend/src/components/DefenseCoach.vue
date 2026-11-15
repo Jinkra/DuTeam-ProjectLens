@@ -30,7 +30,7 @@ function restart() { started.value = false; current.value = 0; answer.value = ''
 </script>
 
 <template>
-  <component :is="embedded ? 'div' : AppShell" v-bind="embedded ? {} : { user, active: 'coach', title: 'AI 答辩教练', subtitle: '模拟评委追问，训练清晰、可信、有证据的答辩表达。' }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
+  <component :is="embedded ? 'div' : AppShell" class="project-tool-view" v-bind="embedded ? {} : { user, active: 'coach', title: 'AI 答辩教练', subtitle: '模拟评委追问，训练清晰、可信、有证据的答辩表达。' }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
     <ProjectContextBar :project="project" active="coach" @navigate="$emit('navigate', $event)" />
     <main class="coach-page">
       <section class="tool-steps"><span class="active"><b>1</b>选择项目与模式</span><i></i><span :class="{ active: started }"><b>2</b>回答模拟问题</span><i></i><span :class="{ active: feedback }"><b>3</b>查看教练反馈</span></section>

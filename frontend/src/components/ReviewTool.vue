@@ -30,7 +30,7 @@ onMounted(() => loadProjects().catch((e) => { error.value = e.message }))
 </script>
 
 <template>
-  <component :is="embedded ? 'div' : AppShell" v-bind="embedded ? {} : { user, active: 'review', title: '项目智能评审', subtitle: '基于证据的六维项目分析与改进建议。' }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
+  <component :is="embedded ? 'div' : AppShell" class="project-tool-view" v-bind="embedded ? {} : { user, active: 'review', title: '项目智能评审', subtitle: '基于证据的六维项目分析与改进建议。' }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
     <ProjectContextBar :project="project" active="review" @navigate="$emit('navigate', $event)" />
     <div class="review-layout" :class="{ 'workspace-review': project }">
       <aside class="project-rail"><div class="rail-heading"><div><h3>评审项目</h3><p>{{ projects.length }} 个项目</p></div><button class="icon-button" title="新建项目" @click="showCreate = true"><Plus :size="17" /></button></div><button v-for="project in projects" :key="project.id" class="rail-project" :class="{ active: selected?.id === project.id }" @click="selected = project"><span>{{ project.name.slice(0, 1) }}</span><div><strong>{{ project.name }}</strong><small>{{ project.review ? `${project.review.total} 分 · 已完成` : '等待评审' }}</small></div></button><button class="new-project-dashed" @click="showCreate = true"><Plus :size="16" />新建评审项目</button></aside>

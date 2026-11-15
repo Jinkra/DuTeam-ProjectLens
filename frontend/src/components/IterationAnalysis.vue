@@ -27,7 +27,7 @@ async function runAnalysis() {
 </script>
 
 <template>
-  <component :is="embedded ? 'div' : AppShell" v-bind="embedded ? {} : { user, active: 'analysis', title: '迭代效果分析', subtitle: '对比评审版本，确认每次改进带来的真实变化。' }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
+  <component :is="embedded ? 'div' : AppShell" class="project-tool-view" v-bind="embedded ? {} : { user, active: 'analysis', title: '迭代效果分析', subtitle: '对比评审版本，确认每次改进带来的真实变化。' }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
     <ProjectContextBar :project="project" active="analysis" @navigate="$emit('navigate', $event)" />
     <main class="analysis-page">
       <section class="tool-steps"><span class="active"><b>1</b>当前项目</span><i></i><span class="active"><b>2</b>选择对比版本</span><i></i><span :class="{ active: analysisReady }"><b>3</b>查看分析结果</span></section>
