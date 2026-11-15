@@ -12,7 +12,7 @@ import AppShell from './components/AppShell.vue'
 import IterationAnalysis from './components/IterationAnalysis.vue'
 import DefenseCoach from './components/DefenseCoach.vue'
 import WorkspaceProjects from './components/WorkspaceProjects.vue'
-import { getActiveWorkspace } from './projectStorage'
+import { getActiveWorkspace, loadAccountProjects } from './projectStorage'
 
 const token = ref(localStorage.getItem('projectlens_token'))
 const user = ref(JSON.parse(localStorage.getItem('projectlens_user') || 'null'))
@@ -23,6 +23,7 @@ const page = ref(requestedAdmin ? 'admin' : requestedPage === 'pricing' ? 'prici
 const authOpen = ref(false)
 const authMode = ref('login')
 const postAuthPage = ref('tools')
+const requestedProjectTool = ref(null)
 const consolePages = new Set(['tools', 'projects', 'workflow-projects', 'review-projects', 'workflow', 'review', 'analysis', 'coach'])
 const activeProject = ref(user.value ? getActiveWorkspace(user.value) : null)
 const isConsolePage = computed(() => consolePages.has(page.value))
@@ -46,9 +47,19 @@ function authenticated(data) {
   authOpen.value = false; page.value = requestedAdmin && data.user.role === 'admin' ? 'admin' : postAuthPage.value
 }
 function navigate(target) {
+  const selectProject = typeof target === 'object' && target.selectProject
+  target = typeof target === 'object' ? target.page : target
   if (!token.value && !['portal', 'pricing', 'admin'].includes(target)) return openAuth('login')
   if (['workflow-projects', 'review-projects'].includes(target)) target = 'projects'
-  if (['workflow', 'review', 'analysis', 'coach'].includes(target) && !activeProject.value) target = 'projects'
+  if (selectProject && ['workflow', 'review', 'analysis', 'coach'].includes(target)) {
+    requestedProjectTool.value = target
+    if (!loadAccountProjects('workspace', user.value).length) window.alert('请先创建项目，再使用该项目工具。')
+    target = 'projects'
+  } else if (['workflow', 'review', 'analysis', 'coach'].includes(target) && !activeProject.value) {
+    requestedProjectTool.value = target
+    window.alert('请先创建项目，再使用该项目工具。')
+    target = 'projects'
+  } else if (target === 'projects') requestedProjectTool.value = null
   page.value = target
   history.replaceState({}, '', target === 'admin' ? '/admin' : target === 'portal' ? '/' : `/#${target}`)
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -92,7 +103,7 @@ onBeforeUnmount(() => {
         <Transition name="console-content" mode="out-in">
           <div :key="page" class="console-content-page">
             <ToolHub v-if="page === 'tools'" embedded :user="user" @navigate="navigate" @logout="logout" />
-            <WorkspaceProjects v-else-if="page === 'projects'" :user="user" @navigate="navigate" />
+            <WorkspaceProjects v-else-if="page === 'projects'" :user="user" :requested-tool="requestedProjectTool" @navigate="navigate" />
             <ProjectLibrary v-else-if="page === 'workflow-projects'" embedded :user="user" kind="workflow" @navigate="navigate" @logout="logout" />
             <ProjectLibrary v-else-if="page === 'review-projects'" embedded :user="user" kind="review" @navigate="navigate" @logout="logout" />
             <WorkflowStudio v-else-if="page === 'workflow'" embedded :user="user" :project="activeProject" @navigate="navigate" @logout="logout" />
