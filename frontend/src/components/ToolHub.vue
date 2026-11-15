@@ -5,8 +5,8 @@ import AppShell from './AppShell.vue'
 import { loadAccountProjects } from '../projectStorage'
 const props = defineProps({ user: Object, embedded: Boolean }); defineEmits(['navigate', 'logout'])
 const tools = [
-  { id: 'review-projects', icon: FileSearch, class: 'tool-blue', name: '项目智能评审', text: '按竞赛标准分析项目材料，输出证据化评分与改进任务。', status: '可用', action: '查看项目' },
-  { id: 'workflow-projects', icon: Workflow, class: 'tool-violet', name: 'Agent 工作流', text: '连接输入、模型、知识库和输出节点，编排自动化流程。', status: '新功能', action: '查看项目' },
+  { id: 'projects', icon: FileSearch, class: 'tool-blue', name: '项目智能评审', text: '进入项目空间，按竞赛标准分析材料并持续改进。', status: '可用', action: '进入项目空间' },
+  { id: 'projects', icon: Workflow, class: 'tool-violet', name: 'Agent 工作流', text: '在同一个项目中连接输入、模型、知识库和输出节点。', status: '新功能', action: '进入项目空间' },
   { id: 'analysis', icon: BarChart3, class: 'tool-orange', name: '迭代效果分析', text: '对比多次评审结果，追踪评分变化和问题关闭进度。', status: '可用', action: '开始分析' },
   { id: 'coach', icon: Bot, class: 'tool-green', name: 'AI 答辩教练', text: '根据项目材料生成答辩问题，模拟评委追问并给出反馈。', status: '可用', action: '开始训练' },
 ]
@@ -17,8 +17,8 @@ const recentProjects = computed(() => [
 ].sort((a, b) => new Date(b.lastOpenedAt || b.updatedAt) - new Date(a.lastOpenedAt || a.updatedAt)).slice(0, 5))
 function refreshProjects() {
   projectGroups.value = {
-    workflow: loadAccountProjects('workflow', props.user),
-    review: loadAccountProjects('review', props.user),
+    workflow: loadAccountProjects('workspace', props.user),
+    review: [],
   }
 }
 onMounted(() => { refreshProjects(); window.addEventListener('projectlens:projects-changed', refreshProjects) })

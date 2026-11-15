@@ -1,16 +1,16 @@
 <script setup>
 import { computed } from 'vue'
-import { Blocks, Bot, ChevronDown, CircleUserRound, Crown, Home, LayoutGrid, LogOut, TrendingUp, Workflow } from 'lucide-vue-next'
+import { Blocks, Bot, ChevronDown, CircleUserRound, Crown, FolderKanban, Home, LayoutGrid, LogOut, TrendingUp, Workflow } from 'lucide-vue-next'
 import SiteFooter from './SiteFooter.vue'
 const props = defineProps({ user: Object, active: String, title: String, subtitle: String, full: Boolean })
 defineEmits(['navigate', 'logout'])
-const navIndex = computed(() => props.active === 'tools' ? 0 : ['workflow', 'workflow-projects'].includes(props.active) ? 1 : ['review', 'review-projects'].includes(props.active) ? 2 : props.active === 'analysis' ? 3 : props.active === 'coach' ? 4 : 5)
+const navIndex = computed(() => props.active === 'tools' ? 0 : props.active === 'projects' ? 1 : ['workflow', 'workflow-projects'].includes(props.active) ? 2 : ['review', 'review-projects'].includes(props.active) ? 3 : props.active === 'analysis' ? 4 : props.active === 'coach' ? 5 : 6)
 </script>
 <template>
   <div class="console-shell" :class="{ 'console-full': full }">
     <aside class="console-sidebar">
       <button class="console-logo" @click="$emit('navigate', 'tools')"><span><img src="/brand/brand-mark.png" alt="" /></span><strong>ProjectLens</strong></button>
-      <nav :style="{ '--nav-index': navIndex }"><i class="console-nav-slider"></i><p>工作空间</p><button :class="{ active: active === 'tools' }" @click="$emit('navigate', 'tools')"><LayoutGrid :size="18" />工具中心</button><button :class="{ active: ['workflow', 'workflow-projects'].includes(active) }" @click="$emit('navigate', 'workflow-projects')"><Workflow :size="18" />工作流</button><button :class="{ active: ['review', 'review-projects'].includes(active) }" @click="$emit('navigate', 'review-projects')"><Blocks :size="18" />项目评审</button><button :class="{ active: active === 'analysis' }" @click="$emit('navigate', 'analysis')"><TrendingUp :size="18" />迭代分析</button><button :class="{ active: active === 'coach' }" @click="$emit('navigate', 'coach')"><Bot :size="18" />AI 答辩教练</button><button :class="{ active: active === 'pricing' }" @click="$emit('navigate', 'pricing')"><Crown :size="18" />会员中心</button></nav>
+      <nav :style="{ '--nav-index': navIndex }"><i class="console-nav-slider"></i><p>工作空间</p><button :class="{ active: active === 'tools' }" @click="$emit('navigate', 'tools')"><LayoutGrid :size="18" />工具中心</button><button :class="{ active: active === 'projects' }" @click="$emit('navigate', 'projects')"><FolderKanban :size="18" />项目空间</button><button :class="{ active: ['workflow', 'workflow-projects'].includes(active) }" @click="$emit('navigate', 'workflow')"><Workflow :size="18" />工作流</button><button :class="{ active: ['review', 'review-projects'].includes(active) }" @click="$emit('navigate', 'review')"><Blocks :size="18" />项目评审</button><button :class="{ active: active === 'analysis' }" @click="$emit('navigate', 'analysis')"><TrendingUp :size="18" />迭代分析</button><button :class="{ active: active === 'coach' }" @click="$emit('navigate', 'coach')"><Bot :size="18" />AI 答辩教练</button><button :class="{ active: active === 'pricing' }" @click="$emit('navigate', 'pricing')"><Crown :size="18" />会员中心</button></nav>
       <div class="console-home-action"><button @click="$emit('navigate', 'portal')"><Home :size="18" />返回首页</button></div>
       <div class="console-user"><CircleUserRound :size="30" /><div><strong>{{ user?.name }}</strong><small>个人工作空间</small></div><button title="退出登录" @click="$emit('logout')"><LogOut :size="16" /></button></div>
     </aside>

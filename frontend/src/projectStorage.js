@@ -1,4 +1,7 @@
 const projectDefaults = {
+  workspace: [
+    { id: 'projectlens-demo', name: 'DuTeam ProjectLens', description: '面向大学生竞赛与课程项目的 AI 项目评审与改进 Agent', category: 'AI Agent 智能助手', status: '进行中', updatedAt: '2026-11-15T09:45:00.000Z', lastOpenedAt: '2026-11-15T09:45:00.000Z' },
+  ],
   workflow: [
     { id: 'wf-competition', name: '竞赛评审自动化', description: '材料读取、知识检索、AI 评审与报告输出', status: '草稿', updatedAt: '2026-11-15T09:30:00.000Z', lastOpenedAt: '2026-11-15T09:30:00.000Z' },
     { id: 'wf-rubric', name: '评分标准核验流程', description: '根据竞赛规则核验评分证据与缺失材料', status: '已完成', updatedAt: '2026-11-12T14:20:00.000Z', lastOpenedAt: '2026-11-12T14:20:00.000Z' },
@@ -53,4 +56,15 @@ export function loadAccountProjects(kind, user) {
 export function saveAccountProjects(kind, user, projects) {
   localStorage.setItem(projectStorageKey(kind, user), JSON.stringify(projects))
   window.dispatchEvent(new CustomEvent('projectlens:projects-changed', { detail: { kind, userId: accountId(user) } }))
+}
+
+export function getActiveWorkspace(user) {
+  const projects = loadAccountProjects('workspace', user)
+  const activeId = localStorage.getItem(activeProjectKey('workspace', user))
+  return projects.find((project) => project.id === activeId) || null
+}
+
+export function setActiveWorkspace(user, project) {
+  localStorage.setItem(activeProjectKey('workspace', user), project.id)
+  window.dispatchEvent(new CustomEvent('projectlens:active-project-changed', { detail: project }))
 }
