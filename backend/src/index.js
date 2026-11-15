@@ -177,6 +177,39 @@ app.get('/api/admin/overview', requireAuth, requireAdmin, async (_req, res) => {
   })
 })
 
+app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
+  const { name, email, password, role = 'user', plan = 'free' } = req.body
+  if (!name?.trim() || !email?.trim() || typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ message: '请填写姓名、邮箱，并使用至少6位密码。' })
+  }
+  if (!['user', 'admin'].includes(role) || !['free', 'pro', 'team'].includes(plan)) {
+    return res.status(400).json({ message: '用户角色或会员套餐无效。' })
+  }
+  const normalizedEmail = email.trim().toLowerCase()
+  const created = await updateStore(async (data) => {
+    if (data.users.some((user) => user.email === normalizedEmail)) return null
+    const createdAt = new Date().toISOString()
+    const user = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      email: normalizedEmail,
+      passwordHash: await bcrypt.hash(password, 10),
+      role,
+      status: 'active',
+      plan,
+      billingCycle: 'monthly',
+      subscriptionExpiresAt: plan === 'free' ? null : new Date(Date.now() + 30 * 86400000).toISOString(),
+      usagePeriodStartedAt: createdAt,
+      usageEvents: [],
+      createdAt,
+    }
+    data.users.push(user)
+    return { ...publicUser(user), status: user.status, plan: user.plan, billingCycle: user.billingCycle, expiresAt: user.subscriptionExpiresAt, usage: usageSnapshot(user), createdAt: user.createdAt }
+  })
+  if (!created) return res.status(409).json({ message: '该邮箱已经注册。' })
+  res.status(201).json(created)
+})
+
 app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
   const allowedPlans = ['free', 'pro', 'team']
   const allowedCycles = ['monthly', 'yearly']
