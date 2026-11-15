@@ -5,6 +5,7 @@ import express from 'express'
 import crypto from 'node:crypto'
 import { requireAuth, signToken } from './auth.js'
 import { chatWithProject } from './assistant.js'
+import { fetchProviderModels, getAiProvider, getAiProviders, publicProvider, saveAiProvider, testProvider } from './ai-config.js'
 import { createReview } from './review.js'
 import { readStore, updateStore } from './store.js'
 
@@ -93,7 +94,15 @@ app.use(cors({
 }))
 app.use(express.json({ limit: '2mb' }))
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, aiConfigured: Boolean(process.env.AI_API_KEY) }))
+app.get('/api/health', async (_req, res) => {
+  const providers = await getAiProviders()
+  res.json({ ok: true, aiConfigured: providers.some((provider) => provider.configured) })
+})
+
+app.get('/api/ai/providers', requireAuth, async (_req, res) => {
+  const providers = await getAiProviders()
+  res.json(providers.map(publicProvider))
+})
 
 app.post('/api/auth/register', async (req, res) => {
   const { name, email, password } = req.body
@@ -153,14 +162,16 @@ app.post('/api/usage/consume', requireAuth, async (req, res) => {
 })
 
 app.post('/api/assistant/chat', requireAuth, async (req, res) => {
-  const { project, question, messages, context, preferences } = req.body
+  const { project, question, messages, context, preferences, providerId = 'deepseek' } = req.body
   if (!project?.id || !project?.name || !question?.trim()) return res.status(400).json({ message: '请选择项目并输入问题。' })
   if (question.trim().length > 2000) return res.status(400).json({ message: '单次提问不能超过2000字。' })
+  const provider = await getAiProvider(providerId)
+  if (!provider.configured) return res.status(503).json({ message: `暂未开放${provider.label}，请联系管理员完成模型配置。` })
   const effortUnits = { 快速响应: 1, 标准推理: 2, 深度分析: 3 }
   const consumed = await consumeUsage(req.user.sub, effortUnits[preferences?.effort] || 2)
   if (consumed.error) return res.status(consumed.status).json({ message: consumed.error, usage: consumed.usage })
   try {
-    const answer = await chatWithProject({ project, question: question.trim(), messages, context, preferences })
+    const answer = await chatWithProject({ project, question: question.trim(), messages, context, preferences, provider })
     res.json({ ...answer, usage: consumed.usage })
   } catch (error) {
     console.error(error)
@@ -169,14 +180,16 @@ app.post('/api/assistant/chat', requireAuth, async (req, res) => {
 })
 
 app.post('/api/reviews/analyze', requireAuth, async (req, res) => {
-  const { project } = req.body
+  const { project, providerId = 'deepseek' } = req.body
   if (!project?.name?.trim()) return res.status(400).json({ message: '项目名称不能为空。' })
+  const provider = await getAiProvider(providerId)
+  if (!provider.configured) return res.status(503).json({ message: `暂未开放${provider.label}，请联系管理员完成模型配置。` })
   const review = await createReview({
     name: project.name.trim(),
     category: project.category || 'AI项目',
     description: project.description || '',
     material: project.material || '',
-  })
+  }, provider)
   res.json(review)
 })
 
@@ -187,6 +200,33 @@ app.get('/api/admin/overview', requireAuth, requireAdmin, async (_req, res) => {
     stats: { users: users.length, paid: users.filter((user) => user.plan !== 'free').length, suspended: users.filter((user) => user.status === 'suspended').length, projects: data.projects.length },
     users,
   })
+})
+
+app.get('/api/admin/ai-providers', requireAuth, requireAdmin, async (_req, res) => {
+  const providers = await getAiProviders()
+  res.json(providers.map(publicProvider))
+})
+
+app.put('/api/admin/ai-providers/:id', requireAuth, requireAdmin, async (req, res) => {
+  const provider = await saveAiProvider(req.params.id, req.body)
+  if (!provider) return res.status(404).json({ message: '没有找到该模型供应商。' })
+  res.json(publicProvider(provider))
+})
+
+app.post('/api/admin/ai-providers/:id/models', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const current = await getAiProvider(req.params.id)
+    const provider = { ...current, baseUrl: String(req.body.baseUrl || current.baseUrl).replace(/\/$/, ''), apiKey: req.body.apiKey || current.apiKey }
+    res.json({ models: await fetchProviderModels(provider) })
+  } catch (error) { res.status(400).json({ message: error.message }) }
+})
+
+app.post('/api/admin/ai-providers/:id/test', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const current = await getAiProvider(req.params.id)
+    const provider = { ...current, baseUrl: String(req.body.baseUrl || current.baseUrl).replace(/\/$/, ''), apiKey: req.body.apiKey || current.apiKey, model: req.body.model || current.model }
+    res.json({ success: true, message: await testProvider(provider) })
+  } catch (error) { res.status(400).json({ message: error.message }) }
 })
 
 app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
@@ -282,9 +322,11 @@ app.post('/api/projects/:id/review', requireAuth, async (req, res) => {
   const data = await readStore()
   const project = data.projects.find((item) => item.id === req.params.id && item.userId === req.user.sub)
   if (!project) return res.status(404).json({ message: '没有找到该项目。' })
+  const provider = await getAiProvider(req.body.providerId || 'deepseek')
+  if (!provider.configured) return res.status(503).json({ message: `暂未开放${provider.label}，请联系管理员完成模型配置。` })
   const consumed = await consumeUsage(req.user.sub)
   if (consumed.error) return res.status(consumed.status).json({ message: consumed.error, usage: consumed.usage })
-  const review = await createReview(project)
+  const review = await createReview(project, provider)
   const updated = await updateStore((store) => {
     const target = store.projects.find((item) => item.id === project.id)
     const now = new Date().toISOString()

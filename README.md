@@ -45,7 +45,7 @@ npm run dev
 
 ## 环境变量
 
-复制 `backend/.env.example` 为 `backend/.env`，至少修改 `JWT_SECRET`。模型配置是可选的：
+复制 `backend/.env.example` 为 `backend/.env`，至少修改 `JWT_SECRET`：
 
 ```env
 JWT_SECRET=replace-with-a-long-random-string
@@ -54,12 +54,9 @@ ADMIN_EMAILS=admin@example.com
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin123
 ADMIN_EMAIL=admin@projectlens.local
-AI_API_KEY=
-AI_BASE_URL=https://api.openai.com/v1
-AI_MODEL=gpt-4o-mini
 ```
 
-`.env` 已加入 `.gitignore`，请勿将真实 API 密钥提交到仓库。`frontend/.env` 只能存放公开配置，任何模型密钥必须保留在 `backend/.env` 中。
+模型API地址、密钥与默认模型在管理后台的“模型API配置”中设置，支持DeepSeek Auto、ChatGPT Auto和Qwen Auto。配置保存在已被Git忽略的`backend/data/store.json`，管理接口只返回密钥脱敏预览。请勿将该数据文件提交到公开仓库。
 
 `ADMIN_EMAILS` 支持配置多个逗号分隔的管理员邮箱。管理员登录后可直接访问 `http://localhost:5173/admin`。
 

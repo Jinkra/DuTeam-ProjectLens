@@ -39,12 +39,12 @@ function fallbackReview(project) {
   }
 }
 
-async function aiReview(project) {
-  const response = await fetch(`${process.env.AI_BASE_URL || 'https://api.openai.com/v1'}/chat/completions`, {
+async function aiReview(project, provider) {
+  const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.AI_API_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
     body: JSON.stringify({
-      model: process.env.AI_MODEL || 'gpt-4o-mini',
+      model: provider.model,
       temperature: 0.2,
       response_format: { type: 'json_object' },
       messages: [
@@ -58,12 +58,7 @@ async function aiReview(project) {
   return { ...JSON.parse(data.choices[0].message.content), mode: 'ai' }
 }
 
-export async function createReview(project) {
-  if (!process.env.AI_API_KEY) return fallbackReview(project)
-  try {
-    return await aiReview(project)
-  } catch (error) {
-    console.error(error)
-    return fallbackReview(project)
-  }
+export async function createReview(project, provider) {
+  if (!provider?.configured) return fallbackReview(project)
+  return aiReview(project, provider)
 }

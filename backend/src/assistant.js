@@ -21,8 +21,8 @@ function fallbackAnswer(project, question, context) {
   }
 }
 
-export async function chatWithProject({ project, question, messages = [], context = {}, preferences = {} }) {
-  if (!process.env.AI_API_KEY) return fallbackAnswer(project, question, context)
+export async function chatWithProject({ project, question, messages = [], context = {}, preferences = {}, provider }) {
+  if (!provider?.configured) return fallbackAnswer(project, question, context)
   const history = messages.slice(-8).map((item) => ({ role: item.role === 'assistant' ? 'assistant' : 'user', content: String(item.content || '').slice(0, 3000) }))
   const projectContext = JSON.stringify({
     name: project?.name,
@@ -41,11 +41,11 @@ export async function chatWithProject({ project, question, messages = [], contex
       findings: (context.workflowReport.findings || []).slice(0, 10),
     } : null,
   }, null, 2)
-  const response = await fetch(`${process.env.AI_BASE_URL || 'https://api.openai.com/v1'}/chat/completions`, {
+  const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.AI_API_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
     body: JSON.stringify({
-      model: process.env.AI_MODEL || 'gpt-4o-mini',
+      model: provider.model,
       temperature: 0.35,
       messages: [
         { role: 'system', content: `你是DuTeam ProjectLens的Duts项目助手。只围绕给定项目上下文回答，明确区分已知事实与建议。回答使用简洁中文，优先给出可执行步骤；引用资料时写出资料名称。当前对话模式：${preferences.mode || '项目问答'}；推理等级：${preferences.effort || '标准推理'}。项目上下文：\n${projectContext}` },

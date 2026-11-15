@@ -6,7 +6,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dataDir = path.join(root, 'data')
 const dataFile = path.join(dataDir, 'store.json')
 
-const initialData = { users: [], projects: [] }
+const initialData = { users: [], projects: [], aiProviders: {} }
 
 export async function readStore() {
   await mkdir(dataDir, { recursive: true })
