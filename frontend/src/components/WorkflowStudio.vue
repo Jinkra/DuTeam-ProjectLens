@@ -16,15 +16,19 @@ const reportReady = ref(false)
 const exporting = ref(false)
 const nodeQuery = ref('')
 const flowInstance = ref(null)
+const flowCanvasRef = ref(null)
 const connectionActive = ref(false)
+const connectingSourceId = ref(null)
+const connectionSuggestions = ref([])
+const suggestedTargetIds = ref([])
 const draggingPalette = ref(null)
 
 function createConfig(type) {
   const common = { failureMode: 'stop', timeout: 60 }
-  if (type === 'input') return { ...common, sourceMode: 'files', acceptedTypes: 'PDF, DOCX, Markdown, 图片', parseImages: true }
+  if (type === 'input') return { ...common, sourceMode: 'files', acceptedTypes: 'PDF, DOCX, Markdown, 图片', parseImages: true, files: [], folderFiles: [], repositoryUrl: '' }
   if (type === 'knowledge') return { ...common, files: [], retrievalMode: 'hybrid', topK: 8, rerank: true }
   if (type === 'agent') return { ...common, model: 'deepseek-chat', reasoningLevel: 'balanced', usageMultiplier: 2, temperature: 0.3 }
-  if (type === 'process') return { ...common, model: 'deepseek-chat', reasoningLevel: 'deep', usageMultiplier: 3, rubric: 'AI Web 竞赛六维评分', strictness: 'balanced' }
+  if (type === 'process') return { ...common, model: 'deepseek-chat', reasoningLevel: 'deep', usageMultiplier: 3, rubric: 'AI 竞赛六维评分', strictness: 'balanced' }
   return { ...common, format: 'pdf', exportPath: '浏览器下载目录/ProjectLens', includeCharts: true, includeEvidence: true }
 }
 
@@ -110,9 +114,40 @@ function onCanvasDrop(event) {
   addNode(item, { x: position.x - 102, y: position.y - 65 })
   draggingPalette.value = null
 }
-function onConnectStart() { connectionActive.value = true; runMessage.value = '拖到目标节点左侧输入端口完成连接' }
+function refreshConnectionSuggestions() {
+  const sourceId = connectingSourceId.value
+  const canvas = flowCanvasRef.value
+  if (!sourceId || !canvas) return
+  const canvasRect = canvas.getBoundingClientRect()
+  const sourceHandle = canvas.querySelector(`.vue-flow__node[data-id="${sourceId}"] .vue-flow__handle-right`)
+  if (!sourceHandle) return
+  const sourceRect = sourceHandle.getBoundingClientRect()
+  const sourceX = sourceRect.left + sourceRect.width / 2 - canvasRect.left
+  const sourceY = sourceRect.top + sourceRect.height / 2 - canvasRect.top
+  const validTargets = nodes.value.filter((node) => !connectionReason({ source: sourceId, target: node.id }))
+  suggestedTargetIds.value = validTargets.map((node) => node.id)
+  connectionSuggestions.value = validTargets.flatMap((node) => {
+    const targetHandle = canvas.querySelector(`.vue-flow__node[data-id="${node.id}"] .vue-flow__handle-left`)
+    if (!targetHandle) return []
+    const targetRect = targetHandle.getBoundingClientRect()
+    const targetX = targetRect.left + targetRect.width / 2 - canvasRect.left
+    const targetY = targetRect.top + targetRect.height / 2 - canvasRect.top
+    return [{ targetId: node.id, path: getBezierPath({ sourceX, sourceY, sourcePosition: Position.Right, targetX, targetY, targetPosition: Position.Left })[0] }]
+  })
+}
+async function onConnectStart({ nodeId, handleType }) {
+  if (!nodeId || handleType !== 'source') return
+  connectionActive.value = true
+  connectingSourceId.value = nodeId
+  runMessage.value = '已标出可连接节点，拖到左侧输入端口完成连接'
+  await nextTick()
+  requestAnimationFrame(refreshConnectionSuggestions)
+}
 function onConnectEnd({ connectionState }) {
   connectionActive.value = false
+  connectingSourceId.value = null
+  connectionSuggestions.value = []
+  suggestedTargetIds.value = []
   if (connectionState.isValid) return
   const source = connectionState.fromNode?.id
   const target = connectionState.toNode?.id
@@ -127,6 +162,12 @@ function updateReasoning(level) {
 function uploadKnowledgeFiles(event) {
   const names = [...(event.target.files || [])].map((file) => file.name)
   selectedNode.value.data.config.files = [...new Set([...(selectedNode.value.data.config.files || []), ...names])]
+  updateSelected()
+  event.target.value = ''
+}
+function uploadInputFiles(event, target = 'files') {
+  const names = [...(event.target.files || [])].map((file) => file.webkitRelativePath || file.name)
+  selectedNode.value.data.config[target] = [...new Set([...(selectedNode.value.data.config[target] || []), ...names])]
   updateSelected()
   event.target.value = ''
 }
@@ -159,8 +200,10 @@ async function runWorkflow() {
   edges.value = edges.value.map((edge) => ({ ...edge, animated: false }))
   reportReady.value = true
   running.value = false
+  await exportReport(true)
 }
-async function exportReport() {
+async function exportReport(automatic = false) {
+  if (exporting.value) return
   exporting.value = true
   const report = {
     id: `PL-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`,
@@ -182,6 +225,11 @@ async function exportReport() {
   try {
     const { exportReviewPdf } = await import('../reportPdf')
     await exportReviewPdf(report)
+    const outputNode = nodes.value.find((node) => node.data.type === 'output')
+    const exportPath = outputNode?.data.config.exportPath || '浏览器下载目录/ProjectLens'
+    runMessage.value = `评审报告导出成功 · 已导出到 ${exportPath}`
+  } catch (error) {
+    runMessage.value = `${automatic ? '自动导出' : '报告导出'}失败：${error.message}`
   } finally { exporting.value = false }
 }
 function onDragStart(event) { selectedNodeId.value = event.node.id; runMessage.value = `正在移动：${event.node.data.label}` }
@@ -207,14 +255,14 @@ async function testSelectedNode() {
 
 <template>
   <AppShell :user="user" active="workflow" title="工作流工作台" subtitle="竞赛项目自动评审 / 草稿" full @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
-    <div class="workflow-toolbar"><button class="button button-ghost" @click="$emit('navigate', 'tools')"><ChevronLeft :size="16" />返回工具中心</button><div class="workflow-name"><strong>竞赛项目自动评审</strong><span>草稿 · 自动保存开启</span></div><div class="toolbar-actions"><button v-if="reportReady" class="button report-button" :disabled="exporting" @click="exportReport"><Download :size="16" />{{ exporting ? '生成 PDF...' : '导出评审报告' }}</button><button class="button button-ghost" @click="saveWorkflow"><Save :size="16" />保存</button><button class="button button-primary" :disabled="running" @click="runWorkflow"><CircleStop v-if="running" :size="16" /><Play v-else :size="16" />{{ running ? '运行中' : '运行工作流' }}</button></div></div>
+    <div class="workflow-toolbar"><button class="button button-ghost" @click="$emit('navigate', 'tools')"><ChevronLeft :size="16" />返回工具中心</button><div class="workflow-name"><strong>竞赛项目自动评审</strong><span>草稿 · 自动保存开启</span></div><div class="toolbar-actions"><button v-if="reportReady" class="button report-button" :disabled="exporting" @click="exportReport()"><Download :size="16" />{{ exporting ? '生成 PDF...' : '导出评审报告' }}</button><button class="button button-ghost" @click="saveWorkflow"><Save :size="16" />保存</button><button class="button button-primary" :disabled="running" @click="runWorkflow"><CircleStop v-if="running" :size="16" /><Play v-else :size="16" />{{ running ? '运行中' : '运行工作流' }}</button></div></div>
     <div class="studio-layout" :class="{ 'inspector-open': selectedNode }">
       <aside class="node-library"><div class="library-heading"><div><h3>节点库</h3><p>拖拽到画布，或点击添加</p></div><Plus :size="18" /></div><label class="node-search"><FileSearch :size="15" /><input v-model="nodeQuery" placeholder="搜索节点" /></label><div class="node-group"><p>基础节点</p><button v-for="item in filteredPalette" :key="item.label" draggable="true" @dragstart="onPaletteDragStart($event, item)" @dragend="draggingPalette = null" @click="addNode(item)"><span :class="item.kind"><component :is="item.icon" :size="17" /></span><div><strong>{{ item.label }}</strong><small>{{ item.desc }}</small></div><Plus :size="14" /></button><div v-if="!filteredPalette.length" class="node-search-empty">没有匹配的节点</div></div><div class="template-callout"><Sparkles :size="17" /><strong>从模板开始</strong><p>使用经过验证的评审流程快速搭建。</p><button>浏览模板</button></div></aside>
-      <main class="flow-canvas" @dragover="onCanvasDragOver" @drop="onCanvasDrop"><div class="canvas-status" :class="{ live: running, warning: runMessage.startsWith('无法连接') }"><i></i>{{ runMessage }}</div><VueFlow v-model:nodes="nodes" v-model:edges="edges" :default-viewport="{ zoom: 0.82 }" :fit-view-options="{ padding: 0.16 }" :min-zoom="0.35" :max-zoom="1.8" :is-valid-connection="isValidConnection" :connection-radius="28" fit-view-on-init @init="onFlowInit" @connect="onConnect" @connect-start="onConnectStart" @connect-end="onConnectEnd" @node-click="selectedNodeId = $event.node.id" @pane-click="selectedNodeId = null" @node-drag-start="onDragStart" @node-drag-stop="onDragStop"><Background pattern-color="#dce1e9" :gap="24" :size="1" /><template #connection-line="{ fromX, fromY, fromPosition, toX, toY, toPosition }"><path :d="getBezierPath({ sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition })[0]" class="connection-preview" :class="{ active: connectionActive }" /></template><template #node-workflow="{ data }"><div class="premium-node" :class="[data.type, data.status]"><Handle type="target" :position="Position.Left" /><div class="premium-node-top"><span class="premium-node-icon"><Upload v-if="data.type === 'input'" :size="16" /><Database v-else-if="data.type === 'knowledge'" :size="16" /><Bot v-else-if="data.type === 'agent'" :size="16" /><FileSearch v-else-if="data.type === 'process'" :size="16" /><FileOutput v-else :size="16" /></span><small>{{ data.kind }}</small><i v-if="data.status === 'completed'"><Check :size="12" /></i><i v-else-if="data.status === 'running'" class="node-spinner"></i></div><strong>{{ data.label }}</strong><p>{{ data.description }}</p><div class="premium-node-meta"><span>{{ data.type === 'agent' || data.type === 'process' ? `${data.config.model} · ${data.config.usageMultiplier}x` : data.type === 'knowledge' ? `${data.config.files.length} 个文件` : '已配置' }}</span><em></em></div><Handle type="source" :position="Position.Right" /></div></template><Controls /><MiniMap pannable zoomable /></VueFlow><div class="canvas-guide"><span>拖拽移动</span><span>滚轮缩放</span><span>从端点连接</span></div></main>
+      <main ref="flowCanvasRef" class="flow-canvas" @dragover="onCanvasDragOver" @drop="onCanvasDrop"><div class="canvas-status" :class="{ live: running, warning: runMessage.startsWith('无法连接') || runMessage.includes('失败') }"><i></i>{{ runMessage }}</div><VueFlow v-model:nodes="nodes" v-model:edges="edges" :default-viewport="{ zoom: 0.82 }" :fit-view-options="{ padding: 0.16 }" :min-zoom="0.35" :max-zoom="1.8" :is-valid-connection="isValidConnection" :connection-radius="28" :pan-on-drag="[1, 2]" fit-view-on-init @init="onFlowInit" @move="connectionActive && refreshConnectionSuggestions()" @connect="onConnect" @connect-start="onConnectStart" @connect-end="onConnectEnd" @node-click="selectedNodeId = $event.node.id" @pane-click="selectedNodeId = null" @node-drag-start="onDragStart" @node-drag-stop="onDragStop"><Background pattern-color="#dce1e9" :gap="24" :size="1" /><template #connection-line="{ fromX, fromY, fromPosition, toX, toY, toPosition }"><path :d="getBezierPath({ sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition })[0]" class="connection-preview" :class="{ active: connectionActive }" /></template><template #node-workflow="{ data, id }"><div class="premium-node" :class="[data.type, data.status, { 'suggested-target': suggestedTargetIds.includes(id) }]"><Handle type="target" :position="Position.Left" /><div class="premium-node-top"><span class="premium-node-icon"><Upload v-if="data.type === 'input'" :size="16" /><Database v-else-if="data.type === 'knowledge'" :size="16" /><Bot v-else-if="data.type === 'agent'" :size="16" /><FileSearch v-else-if="data.type === 'process'" :size="16" /><FileOutput v-else :size="16" /></span><small>{{ data.kind }}</small><i v-if="data.status === 'completed'"><Check :size="12" /></i><i v-else-if="data.status === 'running'" class="node-spinner"></i></div><strong>{{ data.label }}</strong><p>{{ data.description }}</p><div class="premium-node-meta"><span>{{ data.type === 'agent' || data.type === 'process' ? `${data.config.model} · ${data.config.usageMultiplier}x` : data.type === 'knowledge' ? `${data.config.files.length} 个文件` : data.type === 'input' ? `${(data.config.files?.length || 0) + (data.config.folderFiles?.length || 0)} 个材料` : '已配置' }}</span><em></em></div><Handle type="source" :position="Position.Right" /></div></template><Controls /><MiniMap pannable zoomable /></VueFlow><svg v-if="connectionSuggestions.length" class="connection-suggestions" aria-hidden="true"><path v-for="item in connectionSuggestions" :key="item.targetId" :d="item.path" class="connection-suggestion-path" /></svg><div class="canvas-guide"><span>中键/右键平移</span><span>滚轮缩放</span><span>左键从端点连接</span></div></main>
       <aside class="node-inspector"><template v-if="selectedNode"><div class="inspector-heading"><div><span><Settings2 :size="17" /></span><div><h3>{{ selectedNode.data.label }}</h3><p>{{ selectedNode.data.kind }} · NODE {{ selectedNode.id.padStart(2, '0') }}</p></div></div><button class="icon-button danger" title="删除节点" @click="removeSelected"><Trash2 :size="16" /></button></div><div class="node-fixed-summary"><p>{{ selectedNode.data.description }}</p><span>节点名称与类型由工作流定义，不可修改</span></div>
-        <div v-if="selectedNode.data.type === 'input'" class="node-config-fields"><h4>材料输入</h4><label>输入方式<select v-model="selectedNode.data.config.sourceMode" @change="updateSelected"><option value="files">上传文件</option><option value="folder">选择项目目录</option><option value="url">仓库地址</option></select></label><label>支持格式<input :value="selectedNode.data.config.acceptedTypes" readonly /></label><label class="config-toggle"><input v-model="selectedNode.data.config.parseImages" type="checkbox" @change="updateSelected" /><span>解析材料中的截图与图片</span></label></div>
+        <div v-if="selectedNode.data.type === 'input'" class="node-config-fields"><h4>材料输入</h4><label>输入方式<select v-model="selectedNode.data.config.sourceMode" @change="updateSelected"><option value="files">上传文件</option><option value="folder">选择项目目录</option><option value="url">仓库地址</option></select></label><template v-if="selectedNode.data.config.sourceMode === 'files'"><label class="knowledge-upload"><Upload :size="17" /><strong>上传项目材料</strong><small>支持多个方案文档、截图与说明文件</small><input type="file" multiple accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg,.webp" @change="uploadInputFiles($event, 'files')" /></label><div v-if="selectedNode.data.config.files?.length" class="knowledge-files"><span v-for="file in selectedNode.data.config.files" :key="file"><FolderOpen :size="13" />{{ file }}</span></div></template><template v-else-if="selectedNode.data.config.sourceMode === 'folder'"><label class="knowledge-upload"><FolderOpen :size="17" /><strong>选择项目目录</strong><small>将读取目录内的项目材料与代码文件</small><input type="file" webkitdirectory directory multiple @change="uploadInputFiles($event, 'folderFiles')" /></label><div v-if="selectedNode.data.config.folderFiles?.length" class="knowledge-files"><span v-for="file in selectedNode.data.config.folderFiles" :key="file"><FolderOpen :size="13" />{{ file }}</span></div></template><label v-else>仓库地址<input v-model.trim="selectedNode.data.config.repositoryUrl" type="url" placeholder="https://github.com/owner/repository" @input="updateSelected" /></label><label>支持格式<input :value="selectedNode.data.config.acceptedTypes" readonly /></label><label class="config-toggle"><input v-model="selectedNode.data.config.parseImages" type="checkbox" @change="updateSelected" /><span>解析材料中的截图与图片</span></label></div>
         <div v-else-if="selectedNode.data.type === 'knowledge'" class="node-config-fields"><h4>知识库配置</h4><label class="knowledge-upload"><Upload :size="17" /><strong>上传知识库文件</strong><small>PDF、DOCX、TXT、Markdown</small><input type="file" multiple accept=".pdf,.doc,.docx,.txt,.md" @change="uploadKnowledgeFiles" /></label><div v-if="selectedNode.data.config.files.length" class="knowledge-files"><span v-for="file in selectedNode.data.config.files" :key="file"><FolderOpen :size="13" />{{ file }}</span></div><label>检索方式<select v-model="selectedNode.data.config.retrievalMode" @change="updateSelected"><option value="hybrid">混合检索</option><option value="vector">向量检索</option><option value="keyword">关键词检索</option></select></label><label>召回数量<div class="input-suffix"><input v-model.number="selectedNode.data.config.topK" type="number" min="1" max="30" @input="updateSelected" /><span>条</span></div></label><label class="config-toggle"><input v-model="selectedNode.data.config.rerank" type="checkbox" @change="updateSelected" /><span>启用结果重排序</span></label></div>
-        <div v-else-if="['agent', 'process'].includes(selectedNode.data.type)" class="node-config-fields"><h4>模型与推理</h4><label>模型<select v-model="selectedNode.data.config.model" @change="updateSelected"><option value="deepseek-chat">DeepSeek Chat</option><option value="deepseek-reasoner">DeepSeek Reasoner</option><option value="gpt-4o-mini">GPT-4o mini</option><option value="qwen-max">Qwen Max</option></select></label><label>推理等级<div class="reasoning-segments"><button v-for="level in [{ id: 'fast', name: '快速', value: 1 }, { id: 'balanced', name: '平衡', value: 2 }, { id: 'deep', name: '深度', value: 3 }]" :key="level.id" :class="{ active: selectedNode.data.config.reasoningLevel === level.id }" @click="updateReasoning(level.id)">{{ level.name }}<small>{{ level.value }}x</small></button></div></label><div class="usage-multiplier"><Gauge :size="16" /><span>本节点用量倍率</span><strong>{{ selectedNode.data.config.usageMultiplier }}x</strong></div><label v-if="selectedNode.data.type === 'process'">评分标准<select v-model="selectedNode.data.config.rubric" @change="updateSelected"><option>AI Web 竞赛六维评分</option><option>课程项目综合评分</option><option>创新创业项目评分</option></select></label><label v-else>温度<div class="input-suffix"><input v-model.number="selectedNode.data.config.temperature" type="number" min="0" max="1" step="0.1" @input="updateSelected" /><span>{{ selectedNode.data.config.temperature }}</span></div></label></div>
+        <div v-else-if="['agent', 'process'].includes(selectedNode.data.type)" class="node-config-fields"><h4>模型与推理</h4><label>模型<select v-model="selectedNode.data.config.model" @change="updateSelected"><option value="deepseek-chat">DeepSeek Chat</option><option value="deepseek-reasoner">DeepSeek Reasoner</option><option value="gpt-4o-mini">GPT-4o mini</option><option value="qwen-max">Qwen Max</option></select></label><label>推理等级<div class="reasoning-segments"><button v-for="level in [{ id: 'fast', name: '快速', value: 1 }, { id: 'balanced', name: '平衡', value: 2 }, { id: 'deep', name: '深度', value: 3 }]" :key="level.id" :class="{ active: selectedNode.data.config.reasoningLevel === level.id }" @click="updateReasoning(level.id)">{{ level.name }}<small>{{ level.value }}x</small></button></div></label><div class="usage-multiplier"><Gauge :size="16" /><span>本节点用量倍率</span><strong>{{ selectedNode.data.config.usageMultiplier }}x</strong></div><label v-if="selectedNode.data.type === 'process'">评分标准<select v-model="selectedNode.data.config.rubric" @change="updateSelected"><option>AI 竞赛六维评分</option><option>课程项目综合评分</option><option>创新创业项目评分</option></select></label><label v-else>温度<div class="input-suffix"><input v-model.number="selectedNode.data.config.temperature" type="number" min="0" max="1" step="0.1" @input="updateSelected" /><span>{{ selectedNode.data.config.temperature }}</span></div></label></div>
         <div v-else class="node-config-fields"><h4>报告导出</h4><label>报告格式<select v-model="selectedNode.data.config.format" @change="updateSelected"><option value="pdf">PDF 文档</option><option value="docx">Word 文档</option><option value="json">JSON 数据</option></select></label><label>导出路径<input v-model="selectedNode.data.config.exportPath" @input="updateSelected" /></label><label class="config-toggle"><input v-model="selectedNode.data.config.includeCharts" type="checkbox" @change="updateSelected" /><span>包含分析图表</span></label><label class="config-toggle"><input v-model="selectedNode.data.config.includeEvidence" type="checkbox" @change="updateSelected" /><span>包含评分证据链</span></label></div>
         <div class="config-section"><h4>执行控制</h4><label>失败处理<select v-model="selectedNode.data.config.failureMode" @change="updateSelected"><option value="stop">停止工作流</option><option value="skip">跳过并继续</option><option value="retry">自动重试</option></select></label><label>超时时间<div class="input-suffix"><input v-model.number="selectedNode.data.config.timeout" type="number" min="10" max="600" @input="updateSelected" /><span>秒</span></div></label></div><div class="test-node"><button class="button button-ghost" :disabled="running" @click="testSelectedNode"><Play :size="15" />单独测试节点</button></div></template><div v-else class="inspector-empty"><Settings2 :size="28" /><h3>选择一个节点</h3><p>点击画布中的节点，在这里查看并编辑参数。</p></div></aside>
     </div>

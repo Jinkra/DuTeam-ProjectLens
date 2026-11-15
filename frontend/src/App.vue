@@ -27,7 +27,6 @@ function authenticated(data) {
 }
 function navigate(target) {
   if (!token.value && !['portal', 'pricing', 'admin'].includes(target)) return openAuth('login')
-  if (target === 'admin' && user.value?.role !== 'admin') return
   page.value = target
   history.replaceState({}, '', target === 'admin' ? '/admin' : target === 'portal' ? '/' : `/#${target}`)
   window.scrollTo({ top: 0, behavior: 'smooth' })
