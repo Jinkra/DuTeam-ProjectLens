@@ -40,11 +40,11 @@ const nodes = ref([
   { id: '5', type: 'workflow', position: { x: 850, y: 200 }, data: { label: '生成评审报告', kind: 'OUTPUT', type: 'output', description: '评分、风险与改进任务', status: 'idle', config: createConfig('output') } },
 ])
 const edges = ref([
-  { id: 'e1-2', source: '1', target: '2', type: 'bezier', markerEnd: MarkerType.ArrowClosed },
-  { id: 'e1-3', source: '1', target: '3', type: 'bezier', markerEnd: MarkerType.ArrowClosed },
-  { id: 'e2-4', source: '2', target: '4', type: 'bezier', markerEnd: MarkerType.ArrowClosed },
-  { id: 'e3-4', source: '3', target: '4', type: 'bezier', markerEnd: MarkerType.ArrowClosed },
-  { id: 'e4-5', source: '4', target: '5', type: 'bezier', markerEnd: MarkerType.ArrowClosed },
+  { id: 'e1-2', source: '1', target: '2', markerEnd: MarkerType.ArrowClosed },
+  { id: 'e1-3', source: '1', target: '3', markerEnd: MarkerType.ArrowClosed },
+  { id: 'e2-4', source: '2', target: '4', markerEnd: MarkerType.ArrowClosed },
+  { id: 'e3-4', source: '3', target: '4', markerEnd: MarkerType.ArrowClosed },
+  { id: 'e4-5', source: '4', target: '5', markerEnd: MarkerType.ArrowClosed },
 ])
 
 const palette = [
@@ -85,7 +85,7 @@ function connectionReason(connection) {
 function isValidConnection(connection) { return !connectionReason(connection) }
 
 function onConnect(connection) {
-  edges.value = [...edges.value, { id: `e-${Date.now()}`, ...connection, type: 'bezier', markerEnd: MarkerType.ArrowClosed }]
+  flowInstance.value?.addEdges([{ id: `e-${Date.now()}`, ...connection, markerEnd: MarkerType.ArrowClosed }])
   runMessage.value = '节点连接成功'
 }
 async function addNode(item, position = null) {
