@@ -180,7 +180,10 @@ app.get('/api/admin/overview', requireAuth, requireAdmin, async (_req, res) => {
 app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
   const allowedPlans = ['free', 'pro', 'team']
   const allowedCycles = ['monthly', 'yearly']
-  const updated = await updateStore((data) => {
+  if (req.body.password !== undefined && (typeof req.body.password !== 'string' || req.body.password.length < 6)) {
+    return res.status(400).json({ message: '新密码不能少于6位。' })
+  }
+  const updated = await updateStore(async (data) => {
     const user = data.users.find((item) => item.id === req.params.id)
     if (!user) return null
     if (typeof req.body.name === 'string' && req.body.name.trim()) user.name = req.body.name.trim()
@@ -188,6 +191,7 @@ app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =>
     if (['user', 'admin'].includes(req.body.role)) user.role = req.body.role
     if (allowedPlans.includes(req.body.plan)) user.plan = req.body.plan
     if (allowedCycles.includes(req.body.billingCycle)) user.billingCycle = req.body.billingCycle
+    if (req.body.password !== undefined) user.passwordHash = await bcrypt.hash(req.body.password, 10)
     if (req.body.resetUsage) { user.usageEvents = []; user.usagePeriodStartedAt = new Date().toISOString() }
     if (req.body.plan || req.body.billingCycle) {
       const now = new Date()
@@ -198,6 +202,19 @@ app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =>
   })
   if (!updated) return res.status(404).json({ message: '没有找到该用户。' })
   res.json(updated)
+})
+
+app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
+  if (req.params.id === req.user.sub) return res.status(400).json({ message: '不能删除当前登录的管理员账号。' })
+  const deleted = await updateStore((data) => {
+    const index = data.users.findIndex((item) => item.id === req.params.id)
+    if (index < 0) return false
+    data.users.splice(index, 1)
+    data.projects = data.projects.filter((project) => project.userId !== req.params.id)
+    return true
+  })
+  if (!deleted) return res.status(404).json({ message: '没有找到该用户。' })
+  res.json({ success: true })
 })
 
 app.get('/api/projects', requireAuth, async (req, res) => {

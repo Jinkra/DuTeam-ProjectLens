@@ -50,6 +50,11 @@ function authenticated(data) {
   activeProject.value = getActiveWorkspace(data.user)
   authOpen.value = false; page.value = requestedAdmin && data.user.role === 'admin' ? 'admin' : postAuthPage.value
 }
+function adminAuthenticated(data) {
+  authenticated(data)
+  page.value = 'admin'
+  history.replaceState({}, '', '/admin')
+}
 function navigate(target) {
   const selectProject = typeof target === 'object' && target.selectProject
   target = typeof target === 'object' ? target.page : target
@@ -120,7 +125,7 @@ onBeforeUnmount(() => {
         </Transition>
       </AppShell>
       <SubscriptionPage v-else-if="page === 'pricing'" :user="user" @navigate="navigate" @logout="logout" @auth="openAuth" />
-      <AdminPage v-else-if="page === 'admin'" :user="user" @navigate="navigate" @logout="logout" @authenticated="authenticated" />
+      <AdminPage v-else-if="page === 'admin'" :user="user" @navigate="navigate" @logout="logout" @authenticated="adminAuthenticated" />
     </div>
   </Transition>
   <AuthModal v-if="authOpen" :initial-mode="authMode" @close="authOpen = false" @authenticated="authenticated" />
