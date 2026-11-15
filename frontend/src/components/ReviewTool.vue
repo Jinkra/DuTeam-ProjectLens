@@ -4,7 +4,7 @@ import { ArrowRight, Check, ChevronRight, FileText, Plus, ScanSearch, ShieldChec
 import { api } from '../api'
 import AppShell from './AppShell.vue'
 
-defineProps({ user: Object }); defineEmits(['navigate', 'logout'])
+defineProps({ user: Object, embedded: Boolean }); defineEmits(['navigate', 'logout'])
 const projects = ref([]); const selected = ref(null); const showCreate = ref(false); const loading = ref(false); const error = ref('')
 const form = reactive({ name: 'ProjectLens', category: 'AI 教育与学习平台', description: '面向大学生竞赛与课程项目的证据驱动型 AI 评审与改进 Agent。', material: '项目采用 Vue + Node.js 构建，通过 Agent 工作流分析项目材料，使用 RAG 检索证据并按竞赛评分标准生成可解释评分、问题诊断与改进路线。系统支持多模态材料分析、工具调用过程展示、局部重评和改进前后对比。' })
 const review = computed(() => selected.value?.review)
@@ -17,7 +17,7 @@ onMounted(() => loadProjects().catch((e) => { error.value = e.message }))
 </script>
 
 <template>
-  <AppShell :user="user" active="review" title="项目智能评审" subtitle="基于证据的六维项目分析与改进建议。" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
+  <component :is="embedded ? 'div' : AppShell" v-bind="embedded ? {} : { user, active: 'review', title: '项目智能评审', subtitle: '基于证据的六维项目分析与改进建议。' }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
     <div class="review-layout">
       <aside class="project-rail"><div class="rail-heading"><div><h3>评审项目</h3><p>{{ projects.length }} 个项目</p></div><button class="icon-button" title="新建项目" @click="showCreate = true"><Plus :size="17" /></button></div><button v-for="project in projects" :key="project.id" class="rail-project" :class="{ active: selected?.id === project.id }" @click="selected = project"><span>{{ project.name.slice(0, 1) }}</span><div><strong>{{ project.name }}</strong><small>{{ project.review ? `${project.review.total} 分 · 已完成` : '等待评审' }}</small></div></button><button class="new-project-dashed" @click="showCreate = true"><Plus :size="16" />新建评审项目</button></aside>
       <main class="review-workspace"><template v-if="selected"><div class="review-heading"><div><p class="kicker">{{ selected.category }}</p><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></div><button class="button button-primary" :disabled="loading" @click="runReview"><Sparkles :size="17" />{{ loading ? 'Agent 正在评审...' : review ? '重新评审' : '开始 AI 评审' }}</button></div><p v-if="error" class="error-banner">{{ error }}</p>
@@ -28,5 +28,5 @@ onMounted(() => loadProjects().catch((e) => { error.value = e.message }))
       </main>
     </div>
     <div v-if="showCreate" class="modal-backdrop" @click.self="showCreate = false"><form class="project-modal" @submit.prevent="createProject"><div class="modal-heading"><div><p class="kicker">NEW REVIEW</p><h2>创建评审项目</h2></div><button type="button" class="icon-button" @click="showCreate = false"><X :size="19" /></button></div><label>项目名称<input v-model="form.name" required /></label><label>项目方向<select v-model="form.category"><option>AI 教育与学习平台</option><option>AI Agent 智能助手</option><option>RAG 知识问答系统</option><option>AI 协同办公工具</option></select></label><label>项目简介<textarea v-model="form.description" rows="3" required></textarea></label><label>项目材料<textarea v-model="form.material" rows="7"></textarea></label><label class="file-import"><Upload :size="17" />导入 TXT / Markdown<input type="file" accept=".txt,.md" @change="importText" /></label><p v-if="error" class="error-message">{{ error }}</p><div class="modal-actions"><button type="button" class="button button-ghost" @click="showCreate = false">取消</button><button class="button button-primary" :disabled="loading">创建项目<ArrowRight :size="16" /></button></div></form></div>
-  </AppShell>
+  </component>
 </template>

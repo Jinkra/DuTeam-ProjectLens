@@ -6,7 +6,7 @@ import { Bot, Check, ChevronLeft, CircleStop, Database, Download, FileOutput, Fi
 import AppShell from './AppShell.vue'
 import { api } from '../api'
 
-defineProps({ user: Object })
+defineProps({ user: Object, embedded: Boolean })
 defineEmits(['navigate', 'logout'])
 const running = ref(false)
 const runMessage = ref('准备就绪')
@@ -254,7 +254,7 @@ async function testSelectedNode() {
 </script>
 
 <template>
-  <AppShell :user="user" active="workflow" title="工作流工作台" subtitle="竞赛项目自动评审 / 草稿" full @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
+  <component :is="embedded ? 'div' : AppShell" v-bind="embedded ? {} : { user, active: 'workflow', title: '工作流工作台', subtitle: '竞赛项目自动评审 / 草稿', full: true }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
     <div class="workflow-toolbar"><button class="button button-ghost" @click="$emit('navigate', 'tools')"><ChevronLeft :size="16" />返回工具中心</button><div class="workflow-name"><strong>竞赛项目自动评审</strong><span>草稿 · 自动保存开启</span></div><div class="toolbar-actions"><button v-if="reportReady" class="button report-button" :disabled="exporting" @click="exportReport()"><Download :size="16" />{{ exporting ? '生成 PDF...' : '导出评审报告' }}</button><button class="button button-ghost" @click="saveWorkflow"><Save :size="16" />保存</button><button class="button button-primary" :disabled="running" @click="runWorkflow"><CircleStop v-if="running" :size="16" /><Play v-else :size="16" />{{ running ? '运行中' : '运行工作流' }}</button></div></div>
     <div class="studio-layout" :class="{ 'inspector-open': selectedNode }">
       <aside class="node-library"><div class="library-heading"><div><h3>节点库</h3><p>拖拽到画布，或点击添加</p></div><Plus :size="18" /></div><label class="node-search"><FileSearch :size="15" /><input v-model="nodeQuery" placeholder="搜索节点" /></label><div class="node-group"><p>基础节点</p><button v-for="item in filteredPalette" :key="item.label" draggable="true" @dragstart="onPaletteDragStart($event, item)" @dragend="draggingPalette = null" @click="addNode(item)"><span :class="item.kind"><component :is="item.icon" :size="17" /></span><div><strong>{{ item.label }}</strong><small>{{ item.desc }}</small></div><Plus :size="14" /></button><div v-if="!filteredPalette.length" class="node-search-empty">没有匹配的节点</div></div><div class="template-callout"><Sparkles :size="17" /><strong>从模板开始</strong><p>使用经过验证的评审流程快速搭建。</p><button>浏览模板</button></div></aside>
@@ -266,5 +266,5 @@ async function testSelectedNode() {
         <div v-else class="node-config-fields"><h4>报告导出</h4><label>报告格式<select v-model="selectedNode.data.config.format" @change="updateSelected"><option value="pdf">PDF 文档</option><option value="docx">Word 文档</option><option value="json">JSON 数据</option></select></label><label>导出路径<input v-model="selectedNode.data.config.exportPath" @input="updateSelected" /></label><label class="config-toggle"><input v-model="selectedNode.data.config.includeCharts" type="checkbox" @change="updateSelected" /><span>包含分析图表</span></label><label class="config-toggle"><input v-model="selectedNode.data.config.includeEvidence" type="checkbox" @change="updateSelected" /><span>包含评分证据链</span></label></div>
         <div class="config-section"><h4>执行控制</h4><label>失败处理<select v-model="selectedNode.data.config.failureMode" @change="updateSelected"><option value="stop">停止工作流</option><option value="skip">跳过并继续</option><option value="retry">自动重试</option></select></label><label>超时时间<div class="input-suffix"><input v-model.number="selectedNode.data.config.timeout" type="number" min="10" max="600" @input="updateSelected" /><span>秒</span></div></label></div><div class="test-node"><button class="button button-ghost" :disabled="running" @click="testSelectedNode"><Play :size="15" />单独测试节点</button></div></template><div v-else class="inspector-empty"><Settings2 :size="28" /><h3>选择一个节点</h3><p>点击画布中的节点，在这里查看并编辑参数。</p></div></aside>
     </div>
-  </AppShell>
+  </component>
 </template>
