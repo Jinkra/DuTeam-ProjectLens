@@ -7,7 +7,7 @@ const dimensions = [
   ['value', '社会价值与商业潜力', 10],
 ]
 
-function demoReview(project) {
+function fallbackReview(project) {
   const text = `${project.name} ${project.description} ${project.material}`.toLowerCase()
   const has = (...words) => words.some((word) => text.includes(word.toLowerCase()))
   const score = {
@@ -22,9 +22,9 @@ function demoReview(project) {
   const total = Math.round(dimensions.reduce((sum, [key, , weight]) => sum + score[key] * weight, 0) / 100)
 
   return {
-    mode: 'demo',
+    mode: 'fallback',
     total,
-    summary: '项目场景清晰，已经具备可演示的评审闭环。当前最需要补强的是检索证据的可验证性，以及 Agent 工具调用过程的可视化。',
+    summary: '项目场景清晰，已经形成完整的评审闭环。当前最需要补强的是检索证据的可验证性，以及 Agent 工具调用过程的可视化。',
     dimensions: dimensions.map(([key, label, weight]) => ({ key, label, weight, score: score[key] })),
     findings: [
       { level: 'high', title: 'RAG 证据链尚需量化验证', evidence: '材料提到了知识检索，但没有说明切分策略、召回指标和引用纠错机制。', action: '准备固定测试集，对比无 RAG 与启用 RAG 后的答案准确率和引用命中率。' },
@@ -59,11 +59,11 @@ async function aiReview(project) {
 }
 
 export async function createReview(project) {
-  if (!process.env.AI_API_KEY) return demoReview(project)
+  if (!process.env.AI_API_KEY) return fallbackReview(project)
   try {
     return await aiReview(project)
   } catch (error) {
     console.error(error)
-    return { ...demoReview(project), mode: 'fallback' }
+    return fallbackReview(project)
   }
 }

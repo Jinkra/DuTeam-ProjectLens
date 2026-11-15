@@ -7,7 +7,7 @@ import AppShell from './AppShell.vue'
 import { api } from '../api'
 import ProjectContextBar from './ProjectContextBar.vue'
 
-defineProps({ user: Object, embedded: Boolean, project: Object })
+const props = defineProps({ user: Object, embedded: Boolean, project: Object })
 defineEmits(['navigate', 'logout'])
 const running = ref(false)
 const runMessage = ref('准备就绪')
@@ -26,6 +26,7 @@ const suggestedTargetIds = ref([])
 const draggingPalette = ref(null)
 const history = ref([])
 const draggingOrigin = ref(null)
+let restoredViewport = null
 
 function cloneGraphValue(value) {
   return JSON.parse(JSON.stringify(value))
@@ -98,6 +99,34 @@ const edges = ref([
   { id: 'e3-4', source: '3', target: '4', markerEnd: MarkerType.ArrowClosed },
   { id: 'e4-5', source: '4', target: '5', markerEnd: MarkerType.ArrowClosed },
 ])
+
+function workflowStorageKey() {
+  const accountId = props.user?.id || props.user?.email || props.user?.username || 'anonymous'
+  const projectId = props.project?.id || 'default'
+  return `projectlens_${accountId}_${projectId}_workflow`
+}
+function restoreWorkflow() {
+  try {
+    const raw = window.localStorage.getItem(workflowStorageKey())
+    if (!raw) return false
+    const saved = JSON.parse(raw)
+    if (!Array.isArray(saved.nodes) || !Array.isArray(saved.edges)) return false
+    nodes.value = saved.nodes.map((node) => ({ ...node, data: { ...node.data, status: 'idle' } }))
+    edges.value = saved.edges.map((edge) => ({ ...edge, animated: false }))
+    restoredViewport = saved.viewport || null
+    nodeIndex.value = Math.max(0, ...nodes.value.map((node) => Number(node.id) || 0)) + 1
+    history.value = []
+    runMessage.value = saved.savedAt
+      ? `已恢复 ${new Date(saved.savedAt).toLocaleString('zh-CN')} 保存的工作流`
+      : '已恢复保存的工作流'
+    return true
+  } catch {
+    runMessage.value = '保存的数据无法读取，已使用默认工作流'
+    return false
+  }
+}
+
+restoreWorkflow()
 
 const palette = [
   { kind: 'input', label: '文件输入', desc: '读取项目材料', icon: Upload },
@@ -304,11 +333,26 @@ function onDragStop(event) { if (draggingOrigin.value && (draggingOrigin.value.p
 function onFlowInit(instance) {
   flowInstance.value = instance
   setTimeout(() => {
-    if (window.innerWidth <= 760) instance.setCenter(677, 265, { zoom: 0.68, duration: 260 })
+    if (restoredViewport) instance.setViewport(restoredViewport, { duration: 260 })
+    else if (window.innerWidth <= 760) instance.setCenter(677, 265, { zoom: 0.68, duration: 260 })
     else instance.fitView({ padding: 0.12, duration: 260 })
   }, 80)
 }
-function saveWorkflow() { runMessage.value = `已保存 · ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` }
+function saveWorkflow() {
+  try {
+    const savedAt = new Date()
+    window.localStorage.setItem(workflowStorageKey(), JSON.stringify({
+      version: 1,
+      nodes: cloneGraphValue(nodes.value),
+      edges: cloneGraphValue(edges.value),
+      viewport: flowInstance.value?.getViewport?.() || null,
+      savedAt: savedAt.toISOString(),
+    }))
+    runMessage.value = `已保存 · ${savedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+  } catch (error) {
+    runMessage.value = `保存失败：${error.message}`
+  }
+}
 async function testSelectedNode() {
   if (!selectedNode.value || running.value) return
   const id = selectedNode.value.id
@@ -323,9 +367,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleWorkflowShortc
 </script>
 
 <template>
-  <component :is="embedded ? 'div' : AppShell" v-bind="embedded ? {} : { user, active: 'workflow', title: '工作流工作台', subtitle: '竞赛项目自动评审 / 草稿', full: true }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
+  <component :is="embedded ? 'div' : AppShell" v-bind="embedded ? {} : { user, active: 'workflow', title: '工作流工作台', subtitle: '竞赛项目自动评审与流程编排', full: true }" @navigate="$emit('navigate', $event)" @logout="$emit('logout')">
     <ProjectContextBar :project="project" active="workflow" @navigate="$emit('navigate', $event)" />
-    <div class="workflow-toolbar"><button class="button button-ghost" @click="$emit('navigate', 'projects')"><ChevronLeft :size="16" />返回项目空间</button><div class="workflow-name"><strong>{{ project?.name || '项目工作流' }}</strong><span>草稿 · 自动保存开启</span></div><div class="toolbar-actions"><button v-if="reportReady" class="button report-button" :disabled="exporting" @click="exportReport()"><Download :size="16" />{{ exporting ? '生成 PDF...' : '导出评审报告' }}</button><button class="button button-ghost" @click="saveWorkflow"><Save :size="16" />保存</button><button class="button button-primary" :disabled="running" @click="runWorkflow"><CircleStop v-if="running" :size="16" /><Play v-else :size="16" />{{ running ? '运行中' : '运行工作流' }}</button></div></div>
+    <div class="workflow-toolbar"><button class="button button-ghost" @click="$emit('navigate', 'projects')"><ChevronLeft :size="16" />返回项目空间</button><div class="workflow-name"><strong>{{ project?.name || '项目工作流' }}</strong><span>项目工作流 · 更改后请保存</span></div><div class="toolbar-actions"><button v-if="reportReady" class="button report-button" :disabled="exporting" @click="exportReport()"><Download :size="16" />{{ exporting ? '生成 PDF...' : '导出评审报告' }}</button><button class="button button-ghost" @click="saveWorkflow"><Save :size="16" />保存</button><button class="button button-primary" :disabled="running" @click="runWorkflow"><CircleStop v-if="running" :size="16" /><Play v-else :size="16" />{{ running ? '运行中' : '运行工作流' }}</button></div></div>
     <div class="studio-layout" :class="{ 'inspector-open': selectedNode }">
       <aside class="node-library"><div class="library-heading"><div><h3>节点库</h3><p>拖拽到画布，或点击添加</p></div><Plus :size="18" /></div><label class="node-search"><FileSearch :size="15" /><input v-model="nodeQuery" placeholder="搜索节点" /></label><div class="node-group"><p>基础节点</p><button v-for="item in filteredPalette" :key="item.label" draggable="true" @dragstart="onPaletteDragStart($event, item)" @dragend="draggingPalette = null" @click="addNode(item)"><span :class="item.kind"><component :is="item.icon" :size="17" /></span><div><strong>{{ item.label }}</strong><small>{{ item.desc }}</small></div><Plus :size="14" /></button><div v-if="!filteredPalette.length" class="node-search-empty">没有匹配的节点</div></div><div class="template-callout"><Sparkles :size="17" /><strong>从模板开始</strong><p>使用经过验证的评审流程快速搭建。</p><button>浏览模板</button></div></aside>
       <main ref="flowCanvasRef" class="flow-canvas" @dragover="onCanvasDragOver" @drop="onCanvasDrop"><div class="canvas-status" :class="{ live: running, warning: runMessage.startsWith('无法连接') || runMessage.includes('失败') }"><i></i>{{ runMessage }}</div><VueFlow v-model:nodes="nodes" v-model:edges="edges" :default-viewport="{ zoom: 0.82 }" :fit-view-options="{ padding: 0.16 }" :min-zoom="0.35" :max-zoom="1.8" :is-valid-connection="isValidConnection" :connection-radius="28" :delete-key-code="[]" :pan-on-drag="[1, 2]" fit-view-on-init @init="onFlowInit" @move="connectionActive && refreshConnectionSuggestions()" @connect="onConnect" @connect-start="onConnectStart" @connect-end="onConnectEnd" @edge-click="selectedEdgeId = $event.edge.id; selectedNodeId = null" @node-click="selectedNodeId = $event.node.id; selectedEdgeId = null" @pane-click="selectedNodeId = null; selectedEdgeId = null" @node-drag-start="onDragStart" @node-drag-stop="onDragStop"><Background pattern-color="#dce1e9" :gap="24" :size="1" /><template #connection-line="{ fromX, fromY, fromPosition, toX, toY, toPosition }"><path :d="getBezierPath({ sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition })[0]" class="connection-preview" :class="{ active: connectionActive }" /></template><template #node-workflow="{ data, id }"><div class="premium-node" :class="[data.type, data.status, { 'suggested-target': suggestedTargetIds.includes(id) }]"><Handle type="target" :position="Position.Left" /><div class="premium-node-top"><span class="premium-node-icon"><Upload v-if="data.type === 'input'" :size="16" /><Database v-else-if="data.type === 'knowledge'" :size="16" /><Bot v-else-if="data.type === 'agent'" :size="16" /><FileSearch v-else-if="data.type === 'process'" :size="16" /><FileOutput v-else :size="16" /></span><small>{{ data.kind }}</small><i v-if="data.status === 'completed'"><Check :size="12" /></i><i v-else-if="data.status === 'running'" class="node-spinner"></i></div><strong>{{ data.label }}</strong><p>{{ data.description }}</p><div class="premium-node-meta"><span>{{ data.type === 'agent' || data.type === 'process' ? `${data.config.model} · ${data.config.usageMultiplier}x` : data.type === 'knowledge' ? `${data.config.files.length} 个文件` : data.type === 'input' ? `${(data.config.files?.length || 0) + (data.config.folderFiles?.length || 0)} 个材料` : '已配置' }}</span><em></em></div><Handle type="source" :position="Position.Right" /></div></template><Controls /><MiniMap pannable zoomable /></VueFlow><svg v-if="connectionSuggestions.length" class="connection-suggestions" aria-hidden="true"><path v-for="item in connectionSuggestions" :key="item.targetId" :d="item.path" class="connection-suggestion-path" /></svg><div class="canvas-guide"><span>中键/右键平移</span><span>滚轮缩放</span><span>左键从端点连接</span><span>Delete 删除选中连线</span><span>Ctrl+Z 撤回</span></div></main>

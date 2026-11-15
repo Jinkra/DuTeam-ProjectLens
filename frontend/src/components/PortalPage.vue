@@ -1,9 +1,29 @@
 <script setup>
-import { ArrowRight, BarChart3, Blocks, Bot, Check, ChevronRight, CirclePlay, Crown, FileOutput, FileSearch, FolderKanban, Gauge, Settings, Sparkles, Users, Workflow } from 'lucide-vue-next'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { ArrowRight, BarChart3, Blocks, Bot, Check, ChevronRight, CirclePlay, Crown, Database, FileOutput, FileSearch, FolderKanban, Gauge, MessageSquareText, Mic2, Settings, Sparkles, Upload, Users, Workflow } from 'lucide-vue-next'
 import SiteFooter from './SiteFooter.vue'
 
 defineProps({ user: Object })
 defineEmits(['auth', 'navigate'])
+
+const showcaseIndex = ref(0)
+let showcaseTimer = null
+
+function stopShowcase() {
+  if (showcaseTimer) window.clearInterval(showcaseTimer)
+  showcaseTimer = null
+}
+function startShowcase() {
+  stopShowcase()
+  showcaseTimer = window.setInterval(() => { showcaseIndex.value = (showcaseIndex.value + 1) % 3 }, 3000)
+}
+function selectShowcase(index) {
+  showcaseIndex.value = index
+  startShowcase()
+}
+
+onMounted(startShowcase)
+onBeforeUnmount(stopShowcase)
 
 const tools = [
   { id: 'workflow', icon: Workflow, tone: 'blue', title: '节点式工作流', text: '拖拽材料、知识库、模型、评审与报告节点，连接成可运行的自动化流程。', meta: '可视化编排 · 单节点测试 · 操作撤回' },
@@ -28,14 +48,22 @@ const capabilities = [
       <section class="portal-hero portal-hero-v2 shell-width">
         <div class="hero-copy"><div class="announcement"><span>2026</span>项目空间与四类 AI 工具已上线<ChevronRight :size="14" /></div><h1>一个项目，贯穿评审、<br><em>迭代与答辩。</em></h1><p>DuTeam ProjectLens 面向大学生竞赛与课程项目。先创建项目，再在同一空间内编排工作流、完成智能评审、追踪改进效果并训练答辩。</p><div class="hero-actions"><button class="button button-primary button-large" @click="user ? $emit('navigate', 'projects') : $emit('auth', 'register')"><FolderKanban :size="17" />{{ user ? '打开项目空间' : '免费创建项目' }}</button><button class="button button-ghost button-large" @click="user ? $emit('navigate', { page: 'review', selectProject: true }) : $emit('auth', 'login')"><CirclePlay :size="17" />体验项目评审</button></div><div class="hero-proof"><span><Check :size="14" />项目数据按账号隔离</span><span><Check :size="14" />支持国内外多个模型</span><span><Check :size="14" />可导出 PDF 评审报告</span></div></div>
 
-        <div class="workspace-preview" aria-label="ProjectLens 项目空间预览"><div class="workspace-preview-bar"><div><span><img src="/brand/brand-mark.png" alt="" /></span><div><small>当前项目</small><strong>DuTeam ProjectLens</strong></div></div><em>进行中</em></div><div class="workspace-preview-body"><aside><i></i><i></i><i></i><i></i></aside><div class="workspace-preview-main"><div class="workspace-preview-head"><div><small>PROJECT WORKSPACE</small><h2>项目改进工作区</h2></div><span>自动保存</span></div><div class="workspace-preview-tools"><article class="active"><span><Workflow :size="17" /></span><div><strong>节点式工作流</strong><small>5 个节点 · 运行成功</small></div><Check :size="15" /></article><article><span><Blocks :size="17" /></span><div><strong>项目智能评审</strong><small>综合评分 82 · 3 项建议</small></div><ChevronRight :size="15" /></article><article><span><BarChart3 :size="17" /></span><div><strong>迭代效果分析</strong><small>当前版本较基准 +14 分</small></div><ChevronRight :size="15" /></article><article><span><Bot :size="17" /></span><div><strong>AI 答辩教练</strong><small>综合答辩 · 3 题</small></div><ChevronRight :size="15" /></article></div><div class="workspace-preview-foot"><span><FileOutput :size="15" />评审报告已就绪</span><span><Gauge :size="15" />本次用量 3x</span></div></div></div></div>
+        <div class="hero-showcase" aria-label="ProjectLens 产品功能预览" @mouseenter="stopShowcase" @mouseleave="startShowcase">
+          <div class="showcase-slide" :class="{ active: showcaseIndex === 0 }" aria-label="项目空间预览"><div class="workspace-preview"><div class="workspace-preview-bar"><div><span><img src="/brand/brand-mark.png" alt="" /></span><div><small>当前项目</small><strong>DuTeam ProjectLens</strong></div></div><em>进行中</em></div><div class="workspace-preview-body"><aside><i></i><i></i><i></i><i></i></aside><div class="workspace-preview-main"><div class="workspace-preview-head"><div><small>PROJECT WORKSPACE</small><h2>项目改进工作区</h2></div><span>自动保存</span></div><div class="workspace-preview-tools"><article class="active"><span><Workflow :size="17" /></span><div><strong>节点式工作流</strong><small>5 个节点 · 运行成功</small></div><Check :size="15" /></article><article><span><Blocks :size="17" /></span><div><strong>项目智能评审</strong><small>综合评分 82 · 3 项建议</small></div><ChevronRight :size="15" /></article><article><span><BarChart3 :size="17" /></span><div><strong>迭代效果分析</strong><small>当前版本较基准 +14 分</small></div><ChevronRight :size="15" /></article><article><span><Bot :size="17" /></span><div><strong>AI 答辩教练</strong><small>综合答辩 · 3 题</small></div><ChevronRight :size="15" /></article></div><div class="workspace-preview-foot"><span><FileOutput :size="15" />评审报告已就绪</span><span><Gauge :size="15" />本次用量 3x</span></div></div></div></div></div>
+
+          <div class="showcase-slide" :class="{ active: showcaseIndex === 1 }" aria-label="节点式工作台预览"><div class="product-preview workflow-showcase"><header><div><span><Workflow :size="17" /></span><div><small>WORKFLOW STUDIO</small><strong>竞赛项目评审流程</strong></div></div><em><i></i>运行中</em></header><div class="workflow-demo-body"><aside><button><Upload :size="15" /><span>文件输入</span></button><button><Database :size="15" /><span>知识库</span></button><button><Bot :size="15" /><span>AI Agent</span></button><button><FileOutput :size="15" /><span>报告输出</span></button></aside><div class="workflow-demo-canvas"><svg viewBox="0 0 620 330" preserveAspectRatio="none"><path id="showcase-flow-a" d="M130 170 C190 170 178 86 250 86" /><path id="showcase-flow-b" d="M130 170 C190 170 178 252 250 252" /><path id="showcase-flow-c" d="M370 86 C418 86 404 170 460 170" /><path id="showcase-flow-d" d="M370 252 C418 252 404 170 460 170" /><circle r="4"><animateMotion dur="2.4s" repeatCount="indefinite"><mpath href="#showcase-flow-a" /></animateMotion></circle><circle r="4"><animateMotion begin=".7s" dur="2.4s" repeatCount="indefinite"><mpath href="#showcase-flow-b" /></animateMotion></circle><circle r="4"><animateMotion begin="1.3s" dur="2.4s" repeatCount="indefinite"><mpath href="#showcase-flow-c" /></animateMotion></circle></svg><article class="demo-node input"><span><Upload :size="15" /></span><small>INPUT</small><strong>读取项目材料</strong><em>6 个文件</em></article><article class="demo-node parser"><span><FileSearch :size="15" /></span><small>PARSER</small><strong>材料结构化</strong><em>提取目标与证据</em></article><article class="demo-node knowledge"><span><Database :size="15" /></span><small>KNOWLEDGE</small><strong>检索评分标准</strong><em>已命中 12 条</em></article><article class="demo-node agent"><span><Bot :size="15" /></span><small>AGENT</small><strong>AI 评审</strong><em>正在核验证据</em></article></div></div><footer><span>4 个节点运行正常</span><b>保存工作流</b></footer></div></div>
+
+          <div class="showcase-slide" :class="{ active: showcaseIndex === 2 }" aria-label="AI 模拟答辩预览"><div class="product-preview coach-showcase"><header><div><span><Mic2 :size="17" /></span><div><small>AI DEFENSE COACH</small><strong>模拟答辩 · 第 2 题</strong></div></div><em>综合答辩</em></header><div class="coach-demo-body"><div class="coach-demo-progress"><i></i><span>2 / 5</span></div><div class="demo-message ai"><span><Bot :size="15" /></span><div><small>AI 评委</small><p>你们如何保证评审结论有充分的项目证据支撑？</p></div></div><div class="demo-message user"><div><small>我的回答</small><p>系统会定位原始材料片段，并将每项评分与规则、证据和改进建议关联。</p></div><span>DU</span></div><div class="coach-demo-thinking"><MessageSquareText :size="14" /><span>正在分析回答</span><i></i><i></i><i></i></div><div class="coach-demo-scores"><div><span>证据充分度</span><strong>86</strong><i><b style="width:86%"></b></i></div><div><span>表达结构</span><strong>82</strong><i><b style="width:82%"></b></i></div></div></div><footer><span><Check :size="13" />回答已记录</span><b>继续追问</b></footer></div></div>
+
+          <div class="showcase-dots" role="tablist" aria-label="切换产品预览"><button v-for="index in 3" :key="index" :class="{ active: showcaseIndex === index - 1 }" :aria-label="`查看第 ${index} 个产品预览`" @click="selectShowcase(index - 1)"></button></div>
+        </div>
       </section>
 
       <section id="product" class="tool-section product-system shell-width"><div class="section-heading"><div><p class="kicker">PROJECT TOOLCHAIN</p><h2>围绕一个项目，完成四类关键工作</h2></div><p>每个工具共享当前项目上下文，无需重复填写项目名称、方向和材料，切换后即可继续工作。</p></div><div class="portal-tool-grid portal-tool-grid-v2"><button v-for="(tool, index) in tools" :key="tool.id" class="portal-tool-card" @click="user ? $emit('navigate', { page: tool.id, selectProject: true }) : $emit('auth', 'login')"><span class="tool-icon" :class="`tool-${tool.tone}`"><component :is="tool.icon" :size="22" /></span><span class="tool-card-index">0{{ index + 1 }}</span><h3>{{ tool.title }}</h3><p>{{ tool.text }}</p><div><small>{{ tool.meta }}</small><ArrowRight :size="17" /></div></button></div></section>
 
       <section id="workspace-flow" class="workspace-flow"><div class="shell-width workspace-flow-inner"><div class="workspace-flow-copy"><p class="kicker">ONE PROJECT, ONE CONTEXT</p><h2>从创建项目开始，结果持续沉淀。</h2><p>项目不是一次性表单，而是工作流、评审结果、版本变化和答辩训练的共同载体。每次操作都回到同一个项目空间。</p><button class="button button-primary" @click="user ? $emit('navigate', 'projects') : $emit('auth', 'register')">进入项目空间<ArrowRight :size="16" /></button></div><ol class="workspace-flow-steps"><li><b>01</b><div><strong>创建项目</strong><p>录入项目方向、简介与基础材料。</p></div></li><li><b>02</b><div><strong>选择工具</strong><p>进入工作流、评审、迭代分析或答辩教练。</p></div></li><li><b>03</b><div><strong>运行与改进</strong><p>查看证据、评分和建议，持续更新项目。</p></div></li><li><b>04</b><div><strong>沉淀成果</strong><p>导出评审报告，为答辩和复盘提供依据。</p></div></li></ol></div></section>
 
-      <section class="operations-section shell-width"><div class="section-heading"><div><p class="kicker">PRODUCT OPERATIONS</p><h2>从使用到运营，第一版能力已经闭环</h2></div><p>前台负责项目工具与会员体验，后台负责用户、订阅和用量管理，敏感模型配置通过环境变量保留在服务端。</p></div><div class="capability-grid"><article v-for="item in capabilities" :key="item.title"><span><component :is="item.icon" :size="20" /></span><div><h3>{{ item.title }}</h3><p>{{ item.text }}</p></div></article></div></section>
+      <section class="operations-section shell-width"><div class="section-heading"><div><p class="kicker">PRODUCT OPERATIONS</p><h2>从使用到运营，产品能力完整闭环</h2></div><p>前台负责项目工具与会员体验，后台负责用户、订阅和用量管理，敏感模型配置通过环境变量保留在服务端。</p></div><div class="capability-grid"><article v-for="item in capabilities" :key="item.title"><span><component :is="item.icon" :size="20" /></span><div><h3>{{ item.title }}</h3><p>{{ item.text }}</p></div></article></div></section>
 
       <section class="portal-cta shell-width"><div><span><Crown :size="20" /></span><div><small>MEMBERSHIP & USAGE</small><h2>根据团队使用强度选择会员方案</h2><p>会员中心可公开查看，购买操作需要登录；当前付款功能暂未开放。</p></div></div><button class="button button-light" @click="$emit('navigate', 'pricing')">查看会员方案<ArrowRight :size="16" /></button></section>
     </main>

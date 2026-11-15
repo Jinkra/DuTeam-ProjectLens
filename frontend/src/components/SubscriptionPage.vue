@@ -64,6 +64,6 @@ onMounted(loadMembership)
     </main>
     <SiteFooter />
 
-    <div v-if="selectedPlan" class="modal-backdrop" @click.self="selectedPlan = null"><section class="payment-dialog"><button class="icon-button close-button" title="关闭" @click="selectedPlan = null"><X :size="17" /></button><span class="payment-icon"><CreditCard :size="24" /></span><p class="kicker">ORDER CONFIRMATION</p><h2>确认购买 {{ selectedPlan.name }}</h2><div class="payment-summary"><span>套餐</span><strong>{{ selectedPlan.name }}</strong><span>计费周期</span><strong>{{ billing === 'yearly' ? '年付' : '月付' }}</strong><span>支付金额</span><strong>{{ priceText(selectedPlan) }} / 月</strong></div><p>确认后将进入支付流程。演示版本不会发起真实扣款。</p><button class="button button-primary button-wide" @click="confirmPayment">确认付款</button></section></div>
+    <div v-if="selectedPlan" class="modal-backdrop" @click.self="selectedPlan = null"><section class="payment-dialog"><button class="icon-button close-button" title="关闭" @click="selectedPlan = null"><X :size="17" /></button><span class="payment-icon"><CreditCard :size="24" /></span><p class="kicker">ORDER CONFIRMATION</p><h2>确认购买 {{ selectedPlan.name }}</h2><div class="payment-summary"><span>套餐</span><strong>{{ selectedPlan.name }}</strong><span>计费周期</span><strong>{{ billing === 'yearly' ? '年付' : '月付' }}</strong><span>支付金额</span><strong>{{ priceText(selectedPlan) }} / 月</strong></div><p>支付功能暂未开放，当前操作不会产生扣款。</p><button class="button button-primary button-wide" @click="confirmPayment">确认付款</button></section></div>
   </div>
 </template>

@@ -32,7 +32,7 @@ const consoleMeta = computed(() => ({
   projects: { active: 'projects', title: '项目空间', subtitle: '一个项目，一套完整的竞赛改进工作区。' },
   'workflow-projects': { active: 'workflow-projects', title: '工作流项目', subtitle: '管理自动化工作流并继续编排。' },
   'review-projects': { active: 'review-projects', title: '评审项目', subtitle: '管理参赛项目并继续评审。' },
-  workflow: { active: 'workflow', title: '工作流工作台', subtitle: '竞赛项目自动评审 / 草稿', full: true },
+  workflow: { active: 'workflow', title: '工作流工作台', subtitle: '竞赛项目自动评审与流程编排', full: true },
   review: { active: 'review', title: '项目智能评审', subtitle: '基于证据的六维项目分析与改进建议。' },
   analysis: { active: 'analysis', title: '迭代效果分析', subtitle: '对比评审版本，确认每次改进带来的真实变化。' },
   coach: { active: 'coach', title: 'AI 答辩教练', subtitle: '模拟评委追问，训练清晰、可信、有证据的答辩表达。' },
