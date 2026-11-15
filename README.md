@@ -18,9 +18,9 @@ ProjectLens 通过 Agent 工作流分析项目材料，按照 AI Web 竞赛评�
 - 按节点类型配置知识库文件、检索参数、模型、推理等级、用量倍率和报告导出选项
 - 支持单节点测试与完整工作流运行，推理等级按 1x / 2x / 3x 倍率计入会员用量
 - 工作流运行状态可视化，运行完成后可导出带品牌抬头、分析图表和改进建议的 PDF 评审报告
-- 浅色会员中心：用户 ID、会员类型、到期时间和 4 小时 / 24 小时 / 周期总用量
+- 会员中心支持游客浏览套餐，登录后查看用户 ID、会员类型、到期时间和 4 小时 / 24 小时 / 周期总用量
 - Free、Pro、Team 三级会员限额，达到任一滚动窗口上限后由服务端阻止继续运行
-- `/admin` 管理后台：用户、角色、状态、订阅和用量重置
+- 独立 `/admin` 管理后台：用户、角色、状态、订阅和用量重置
 - 支持 OpenAI 兼容 API，未配置密钥时自动进入演示模式
 
 ## 技术栈
@@ -51,6 +51,9 @@ npm run dev
 JWT_SECRET=replace-with-a-long-random-string
 WEB_ORIGINS=http://localhost:5173,http://localhost:5174
 ADMIN_EMAILS=admin@example.com
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin123
+ADMIN_EMAIL=admin@projectlens.local
 AI_API_KEY=
 AI_BASE_URL=https://api.openai.com/v1
 AI_MODEL=gpt-4o-mini
@@ -59,6 +62,8 @@ AI_MODEL=gpt-4o-mini
 `.env` 已加入 `.gitignore`，请勿将真实 API 密钥提交到仓库。`frontend/.env` 只能存放公开配置，任何模型密钥必须保留在 `backend/.env` 中。
 
 `ADMIN_EMAILS` 支持配置多个逗号分隔的管理员邮箱。管理员登录后可直接访问 `http://localhost:5173/admin`。
+
+首次启动会创建 Demo 管理员 `admin / admin123`。公开部署前必须通过环境变量修改默认管理员密码。
 
 ## 项目结构
 

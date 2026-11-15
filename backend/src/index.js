@@ -15,6 +15,11 @@ const configuredOrigins = (process.env.WEB_ORIGINS || process.env.WEB_ORIGIN || 
   .filter(Boolean)
 const isLocalOrigin = (origin) => /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
 const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean)
+const defaultAdmin = {
+  username: process.env.ADMIN_USERNAME || 'admin',
+  password: process.env.ADMIN_PASSWORD || 'admin123',
+  email: process.env.ADMIN_EMAIL || 'admin@projectlens.local',
+}
 // Rolling-window limits are enforced server-side for every AI operation.
 const planLimits = {
   free: { fourHours: 5, day: 15, total: 100 },
@@ -23,7 +28,21 @@ const planLimits = {
 }
 
 function publicUser(user) {
-  return { id: user.id, name: user.name, email: user.email, role: user.role || (adminEmails.includes(user.email) ? 'admin' : 'user') }
+  return { id: user.id, name: user.name, username: user.username || null, email: user.email, role: user.role || (adminEmails.includes(user.email) ? 'admin' : 'user') }
+}
+
+async function ensureDefaultAdmin() {
+  await updateStore(async (data) => {
+    const existing = data.users.find((user) => user.username === defaultAdmin.username || user.email === defaultAdmin.email)
+    if (existing) {
+      existing.username = defaultAdmin.username
+      existing.role = 'admin'
+      existing.status = 'active'
+      return
+    }
+    const createdAt = new Date().toISOString()
+    data.users.push({ id: crypto.randomUUID(), username: defaultAdmin.username, name: '系统管理员', email: defaultAdmin.email, passwordHash: await bcrypt.hash(defaultAdmin.password, 10), role: 'admin', status: 'active', plan: 'free', billingCycle: 'monthly', usagePeriodStartedAt: createdAt, usageEvents: [], createdAt })
+  })
 }
 
 function usageSnapshot(user, now = Date.now()) {
@@ -117,7 +136,8 @@ app.post('/api/subscription', requireAuth, async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   const data = await readStore()
-  const user = data.users.find((item) => item.email === req.body.email?.trim().toLowerCase())
+  const identifier = req.body.email?.trim().toLowerCase()
+  const user = data.users.find((item) => item.email === identifier || item.username?.toLowerCase() === identifier)
   if (!user || !(await bcrypt.compare(req.body.password || '', user.passwordHash))) return res.status(401).json({ message: '邮箱或密码不正确。' })
   if (user.status === 'suspended') return res.status(403).json({ message: '该账号已被暂停，请联系管理员。' })
   res.json({ token: signToken(user), user: publicUser(user) })
@@ -198,4 +218,5 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ message: '服务暂时不可用，请稍后重试。' })
 })
 
+await ensureDefaultAdmin()
 app.listen(port, () => console.log(`ProjectLens API running at http://localhost:${port}`))

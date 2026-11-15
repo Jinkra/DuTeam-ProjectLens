@@ -16,15 +16,15 @@ const authOpen = ref(false)
 const authMode = ref('login')
 const postAuthPage = ref('tools')
 
-function openAuth(mode = 'login') { authMode.value = mode; postAuthPage.value = ['pricing', 'admin'].includes(page.value) ? page.value : 'tools'; authOpen.value = true }
+function openAuth(mode = 'login') { authMode.value = mode; postAuthPage.value = page.value === 'pricing' ? 'pricing' : 'tools'; authOpen.value = true }
 function authenticated(data) {
   token.value = data.token; user.value = data.user
   localStorage.setItem('projectlens_token', data.token)
   localStorage.setItem('projectlens_user', JSON.stringify(data.user))
-  authOpen.value = false; page.value = postAuthPage.value
+  authOpen.value = false; page.value = requestedAdmin && data.user.role === 'admin' ? 'admin' : postAuthPage.value
 }
 function navigate(target) {
-  if (!token.value && target !== 'portal') return openAuth('login')
+  if (!token.value && !['portal', 'pricing', 'admin'].includes(target)) return openAuth('login')
   if (target === 'admin' && user.value?.role !== 'admin') return
   page.value = target
   history.replaceState({}, '', target === 'admin' ? '/admin' : target === 'portal' ? '/' : `/#${target}`)
@@ -33,8 +33,9 @@ function navigate(target) {
 function logout() {
   localStorage.removeItem('projectlens_token'); localStorage.removeItem('projectlens_user')
   token.value = null; user.value = null; page.value = 'portal'
+  history.replaceState({}, '', '/')
 }
-onMounted(() => { if (!token.value && !requestedAdmin) page.value = 'portal'; if (!token.value && requestedAdmin) openAuth('login') })
+onMounted(() => { if (!token.value && !requestedAdmin && page.value !== 'pricing') page.value = 'portal' })
 </script>
 
 <template>
@@ -42,7 +43,7 @@ onMounted(() => { if (!token.value && !requestedAdmin) page.value = 'portal'; if
   <ToolHub v-else-if="page === 'tools'" :user="user" @navigate="navigate" @logout="logout" />
   <WorkflowStudio v-else-if="page === 'workflow'" :user="user" @navigate="navigate" @logout="logout" />
   <ReviewTool v-else-if="page === 'review'" :user="user" @navigate="navigate" @logout="logout" />
-  <SubscriptionPage v-else-if="page === 'pricing'" :user="user" @navigate="navigate" @logout="logout" />
-  <AdminPage v-else-if="page === 'admin'" :user="user" @navigate="navigate" @logout="logout" />
+  <SubscriptionPage v-else-if="page === 'pricing'" :user="user" @navigate="navigate" @logout="logout" @auth="openAuth" />
+  <AdminPage v-else-if="page === 'admin'" :user="user" @navigate="navigate" @logout="logout" @authenticated="authenticated" />
   <AuthModal v-if="authOpen" :initial-mode="authMode" @close="authOpen = false" @authenticated="authenticated" />
 </template>
