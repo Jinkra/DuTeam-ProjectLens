@@ -13,7 +13,7 @@ const user = ref(JSON.parse(localStorage.getItem('projectlens_user') || 'null'))
 const requestedAdmin = window.location.pathname === '/admin'
 const requestedPage = window.location.hash.replace(/^#/, '')
 const publicPages = ['portal', 'pricing']
-const page = ref(requestedAdmin ? 'admin' : requestedPage === 'pricing' ? 'pricing' : token.value && requestedPage ? requestedPage : token.value ? 'tools' : 'portal')
+const page = ref(requestedAdmin ? 'admin' : requestedPage === 'pricing' ? 'pricing' : token.value && requestedPage ? requestedPage : 'portal')
 const authOpen = ref(false)
 const authMode = ref('login')
 const postAuthPage = ref('tools')
