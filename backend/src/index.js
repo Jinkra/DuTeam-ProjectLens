@@ -168,6 +168,18 @@ app.post('/api/assistant/chat', requireAuth, async (req, res) => {
   }
 })
 
+app.post('/api/reviews/analyze', requireAuth, async (req, res) => {
+  const { project } = req.body
+  if (!project?.name?.trim()) return res.status(400).json({ message: '项目名称不能为空。' })
+  const review = await createReview({
+    name: project.name.trim(),
+    category: project.category || 'AI项目',
+    description: project.description || '',
+    material: project.material || '',
+  })
+  res.json(review)
+})
+
 app.get('/api/admin/overview', requireAuth, requireAdmin, async (_req, res) => {
   const data = await readStore()
   const users = data.users.map((user) => ({ ...publicUser(user), status: user.status || 'active', plan: user.plan || 'free', billingCycle: user.billingCycle || 'monthly', expiresAt: user.subscriptionExpiresAt || null, usage: usageSnapshot(user), createdAt: user.createdAt }))

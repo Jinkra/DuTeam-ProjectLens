@@ -15,6 +15,7 @@ const selectedNodeId = ref(null)
 const selectedEdgeId = ref(null)
 const nodeIndex = ref(6)
 const reportReady = ref(false)
+const reviewResult = ref(null)
 const exporting = ref(false)
 const nodeQuery = ref('')
 const flowInstance = ref(null)
@@ -292,30 +293,33 @@ async function runWorkflow() {
   }
   nodes.value = nodes.value.map((node) => ({ ...node, data: { ...node.data, status: 'completed' } }))
   const duration = ((performance.now() - startedAt) / 1000).toFixed(1)
-  runMessage.value = `运行完成 · ${nodes.value.length}个节点 · ${duration}s`
+  runMessage.value = '正在生成评审分析...'
   edges.value = edges.value.map((edge) => ({ ...edge, animated: false }))
-  reportReady.value = true
-  running.value = false
-  await exportReport(true)
+  try {
+    const materials = nodes.value.flatMap((node) => [...(node.data.config?.files || []), ...(node.data.config?.folderFiles || [])])
+    reviewResult.value = await api('/reviews/analyze', { method: 'POST', body: JSON.stringify({ project: { name: props.project?.name || '未命名项目', category: props.project?.category, description: props.project?.description, material: materials.length ? `已上传材料：${materials.join('、')}` : props.project?.description || '' } }) })
+    const modeLabel = reviewResult.value.mode === 'ai' ? '模型智能评审' : '规则辅助评审'
+    runMessage.value = `运行完成 · ${nodes.value.length}个节点 · ${duration}s · ${modeLabel}`
+    reportReady.value = true
+    await exportReport(true)
+  } catch (error) {
+    runMessage.value = `评审分析失败：${error.message}`
+  } finally { running.value = false }
 }
 async function exportReport(automatic = false) {
-  if (exporting.value) return
+  if (exporting.value || !reviewResult.value) return
   exporting.value = true
+  const result = reviewResult.value
   const report = {
     id: `PL-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`,
-    title: '竞赛项目自动评审报告',
+    projectName: props.project?.name || '未命名项目',
+    title: `${props.project?.name || '未命名项目'}评审报告`,
+    analysisMode: result.mode === 'ai' ? '模型智能评审' : '规则辅助评审',
     generatedAt: new Date().toLocaleString('zh-CN'),
-    total: 82,
-    summary: '项目目标清晰，工作流已经形成从材料读取、证据检索到报告生成的完整闭环。当前优势集中在工程完成度与AI技术路径，下一阶段应加强量化验证、真实案例对照和证据链稳定性。',
-    dimensions: [
-      { label: 'AI技术深度', score: 86, weight: 25 }, { label: '创新性', score: 80, weight: 20 }, { label: '工程质量', score: 88, weight: 20 },
-      { label: '实用性', score: 84, weight: 15 }, { label: '用户体验', score: 78, weight: 10 }, { label: '商业潜力', score: 74, weight: 10 },
-    ],
-    findings: [
-      { title: 'RAG证据链需要量化验证', evidence: '当前材料描述了知识检索流程，但缺少召回率、引用命中率与错误引用率等指标。', action: '建立固定测试集，对比启用与未启用RAG时的准确率和证据命中率。' },
-      { title: 'Agent决策过程仍可增强可解释性', evidence: '工作流展示了节点状态，但评审判断与证据之间的映射仍需更清晰。', action: '在报告中保留每项评分对应的证据片段、规则条目和模型判断摘要。' },
-      { title: '商业验证数据不足', evidence: '套餐与用量机制已具备产品形态，但尚未展示真实团队使用数据。', action: '邀请3-5个参赛团队进行试用，记录留存、评审次数和改进完成率。' },
-    ],
+    total: result.total,
+    summary: result.summary,
+    dimensions: result.dimensions,
+    findings: result.findings,
     nodes: nodes.value.map((node) => ({ name: node.data.label, type: node.data.kind, status: node.data.status, description: node.data.description })),
   }
   try {
