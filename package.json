@@ -2,11 +2,11 @@
   "name": "duteam-projectlens",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["apps/*"],
+  "workspaces": ["frontend", "backend"],
   "scripts": {
-    "dev": "concurrently -n web,api -c cyan,green \"npm run dev -w apps/web\" \"npm run dev -w apps/server\"",
-    "build": "npm run build -w apps/web",
-    "start": "npm run start -w apps/server"
+    "dev": "concurrently -n frontend,backend -c cyan,green \"npm run dev -w frontend\" \"npm run dev -w backend\"",
+    "build": "npm run build -w frontend",
+    "start": "npm run start -w backend"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

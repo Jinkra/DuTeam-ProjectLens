@@ -26,7 +26,8 @@ ProjectLens 通过 Agent 工作流分析项目材料，按照 AI Web 竞赛评�
 
 ```bash
 npm install
-copy .env.example .env
+copy backend\.env.example backend\.env
+copy frontend\.env.example frontend\.env
 npm run dev
 ```
 
@@ -34,7 +35,7 @@ npm run dev
 
 ## 环境变量
 
-复制 `.env.example` 为 `.env`，至少修改 `JWT_SECRET`。模型配置是可选的：
+复制 `backend/.env.example` 为 `backend/.env`，至少修改 `JWT_SECRET`。模型配置是可选的：
 
 ```env
 JWT_SECRET=replace-with-a-long-random-string
@@ -43,14 +44,27 @@ AI_BASE_URL=https://api.openai.com/v1
 AI_MODEL=gpt-4o-mini
 ```
 
-`.env` 已加入 `.gitignore`，请勿将真实 API 密钥提交到仓库。前端变量只能存放公开配置，任何模型密钥必须保留在服务端环境变量中。
+`.env` 已加入 `.gitignore`，请勿将真实 API 密钥提交到仓库。`frontend/.env` 只能存放公开配置，任何模型密钥必须保留在 `backend/.env` 中。
 
 ## 项目结构
 
 ```text
-apps/
-  web/       Vue 前端
-  server/    Express API、认证和评审服务
+frontend/    Vue 前端，可独立安装与启动
+backend/     Express API、认证和评审服务，可独立安装与启动
+```
+
+也可以分别启动：
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
 ## 当前 Demo 边界
