@@ -81,17 +81,18 @@ function connectionReason(connection) {
 function isValidConnection(connection) { return !connectionReason(connection) }
 
 function onConnect(connection) {
-  edges.value.push({ id: `e-${Date.now()}`, ...connection, type: 'bezier', markerEnd: MarkerType.ArrowClosed })
+  edges.value = [...edges.value, { id: `e-${Date.now()}`, ...connection, type: 'bezier', markerEnd: MarkerType.ArrowClosed }]
   runMessage.value = '节点连接成功'
 }
 async function addNode(item, position = null) {
   const id = String(nodeIndex.value++)
   const offset = (nodes.value.length % 3) * 26
   const node = { id, type: 'workflow', position: position || { x: 550 + offset, y: 390 + offset }, data: { label: item.label, kind: item.kind.toUpperCase(), type: item.kind, description: item.desc, status: 'idle', config: createConfig(item.kind) } }
-  nodes.value.push(node)
+  nodes.value = [...nodes.value, node]
   selectedNodeId.value = id
   runMessage.value = `已添加「${item.label}」，请在右侧完成配置`
   await nextTick()
+  flowInstance.value?.updateNodeInternals?.([id])
   if (!position) flowInstance.value?.setCenter(node.position.x + 102, node.position.y + 65, { zoom: 0.9, duration: 320 })
 }
 function onPaletteDragStart(event, item) {

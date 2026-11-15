@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import PortalPage from './components/PortalPage.vue'
 import AuthModal from './components/AuthModal.vue'
 import ToolHub from './components/ToolHub.vue'
@@ -11,7 +11,9 @@ import AdminPage from './components/AdminPage.vue'
 const token = ref(localStorage.getItem('projectlens_token'))
 const user = ref(JSON.parse(localStorage.getItem('projectlens_user') || 'null'))
 const requestedAdmin = window.location.pathname === '/admin'
-const page = ref(requestedAdmin ? 'admin' : token.value ? 'tools' : 'portal')
+const requestedPage = window.location.hash.replace(/^#/, '')
+const publicPages = ['portal', 'pricing']
+const page = ref(requestedAdmin ? 'admin' : requestedPage === 'pricing' ? 'pricing' : token.value && requestedPage ? requestedPage : token.value ? 'tools' : 'portal')
 const authOpen = ref(false)
 const authMode = ref('login')
 const postAuthPage = ref('tools')
@@ -31,11 +33,30 @@ function navigate(target) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 function logout() {
+  const stayOnMembership = page.value === 'pricing'
   localStorage.removeItem('projectlens_token'); localStorage.removeItem('projectlens_user')
-  token.value = null; user.value = null; page.value = 'portal'
-  history.replaceState({}, '', '/')
+  token.value = null; user.value = null; page.value = stayOnMembership ? 'pricing' : 'portal'
+  history.replaceState({}, '', stayOnMembership ? '/#pricing' : '/')
 }
-onMounted(() => { if (!token.value && !requestedAdmin && page.value !== 'pricing') page.value = 'portal' })
+function syncSession() {
+  const storedToken = localStorage.getItem('projectlens_token')
+  const storedUser = JSON.parse(localStorage.getItem('projectlens_user') || 'null')
+  token.value = storedToken
+  user.value = storedToken ? storedUser : null
+  if (!storedToken && !publicPages.includes(page.value) && page.value !== 'admin') navigate('portal')
+}
+function syncVisibleSession() { if (document.visibilityState === 'visible') syncSession() }
+onMounted(() => {
+  if (!token.value && !requestedAdmin && page.value !== 'pricing') page.value = 'portal'
+  window.addEventListener('storage', syncSession)
+  window.addEventListener('pageshow', syncSession)
+  document.addEventListener('visibilitychange', syncVisibleSession)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('storage', syncSession)
+  window.removeEventListener('pageshow', syncSession)
+  document.removeEventListener('visibilitychange', syncVisibleSession)
+})
 </script>
 
 <template>
