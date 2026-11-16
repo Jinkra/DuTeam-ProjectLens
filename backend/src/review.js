@@ -71,13 +71,20 @@ function validateReview(review) {
   return { ...review, total: Number(review.total), mode: 'ai' }
 }
 
+function reviewModel(provider) {
+  const model = String(provider?.model || '')
+  if (/^deepseek-reasoner$/i.test(model)) return 'deepseek-chat'
+  return model
+}
+
 async function requestReview(project, provider, retry = false) {
+  const model = reviewModel(provider)
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
     signal: AbortSignal.timeout(80000),
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
     body: JSON.stringify({
-      model: provider.model,
+      model,
       temperature: 0.1,
       max_tokens: retry ? 1800 : 1400,
       response_format: { type: 'json_object' },
@@ -89,9 +96,14 @@ async function requestReview(project, provider, retry = false) {
   })
   if (!response.ok) throw new Error(`AI API request failed: ${response.status}`)
   const data = await response.json()
-  const content = data.choices?.[0]?.message?.content
-  if (!content) throw new Error('模型没有返回评审内容。')
-  if (data.choices?.[0]?.finish_reason === 'length') throw new Error('模型输出达到长度上限，JSON未完整生成。')
+  const choice = data.choices?.[0]
+  const content = choice?.message?.content
+  if (choice?.finish_reason === 'length') throw new Error('模型输出达到长度上限，JSON未完整生成。')
+  if (!content) {
+    const reason = choice?.finish_reason ? `，结束原因：${choice.finish_reason}` : ''
+    const reasoningOnly = choice?.message?.reasoning_content ? '，模型只返回了推理过程而没有最终答案' : ''
+    throw new Error(`模型没有返回评审内容${reason}${reasoningOnly}。`)
+  }
   return validateReview(extractJson(content))
 }
 
@@ -99,12 +111,12 @@ async function aiReview(project, provider) {
   try {
     return await requestReview(project, provider)
   } catch (error) {
-    if (!/JSON|结构|长度上限/.test(error.message)) throw error
+    if (!/JSON|结构|长度上限|没有返回评审内容/.test(error.message)) throw error
     return requestReview(project, provider, true)
   }
 }
 
-export { extractJson, prepareProject, validateReview }
+export { extractJson, prepareProject, reviewModel, validateReview }
 
 export async function createReview(project, provider) {
   if (!provider?.configured) throw new Error('当前模型尚未配置，无法执行AI评审。')
