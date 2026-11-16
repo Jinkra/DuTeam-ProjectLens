@@ -74,6 +74,7 @@ const uploadingNodeId = ref(null);
 let restoredViewport = null;
 let autoSaveTimer = null;
 let workflowReady = false;
+const supportedMaterialTypes = "DOCX, XLS/XLSX, Markdown, TXT";
 
 function cloneGraphValue(value) {
   return JSON.parse(JSON.stringify(value));
@@ -153,7 +154,7 @@ function createConfig(type) {
     return {
       ...common,
       sourceMode: "files",
-      acceptedTypes: "DOCX, XLS/XLSX, Markdown, TXT",
+      acceptedTypes: supportedMaterialTypes,
       files: [],
       folderFiles: [],
       repositoryUrl: "",
@@ -287,6 +288,9 @@ function restoreWorkflow() {
         status: "idle",
         config: {
           ...node.data.config,
+          ...(node.data.type === "input"
+            ? { acceptedTypes: supportedMaterialTypes, parseImages: false }
+            : {}),
           providerId:
             node.data.config?.providerId ||
             (String(node.data.config?.model || "").startsWith("qwen")
@@ -1285,7 +1289,7 @@ onBeforeUnmount(() => {
                 @input="updateSelected" /></label
             ><label
               >支持格式<input
-                :value="selectedNode.data.config.acceptedTypes"
+                :value="supportedMaterialTypes"
                 readonly /></label
             >
           </div>
