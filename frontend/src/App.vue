@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PortalPage from './components/PortalPage.vue'
 import AuthModal from './components/AuthModal.vue'
 import ToolHub from './components/ToolHub.vue'
@@ -14,7 +14,7 @@ import DefenseCoach from './components/DefenseCoach.vue'
 import ProjectAssistant from './components/ProjectAssistant.vue'
 import WorkspaceProjects from './components/WorkspaceProjects.vue'
 import AccountMembership from './components/AccountMembership.vue'
-import { getActiveWorkspace, loadAccountProjects } from './projectStorage'
+import { getActiveWorkspace, loadAccountProjects, refreshWorkspaceProjects, setActiveWorkspace } from './projectStorage'
 import { ArrowUp } from 'lucide-vue-next'
 import { initializeAliyunCaptcha } from './aliyunCaptcha'
 
@@ -31,6 +31,7 @@ const requestedProjectTool = ref(null)
 const consolePages = new Set(['tools', 'projects', 'membership', 'workflow-projects', 'review-projects', 'workflow', 'review', 'analysis', 'coach', 'assistant'])
 const activeProject = ref(user.value ? getActiveWorkspace(user.value) : null)
 const showBackToTop = ref(false)
+let revealObserver = null
 const isConsolePage = computed(() => consolePages.has(page.value))
 const consoleMeta = computed(() => ({
   tools: { active: 'tools', title: '工具中心', subtitle: '选择一个工具，开始处理你的项目。' },
@@ -46,15 +47,19 @@ const consoleMeta = computed(() => ({
 }[page.value]))
 
 function openAuth(mode = 'login') { authMode.value = mode; postAuthPage.value = page.value === 'pricing' ? 'pricing' : 'tools'; authOpen.value = true }
-function authenticated(data) {
+async function authenticated(data) {
   token.value = data.token; user.value = data.user
   localStorage.setItem('projectlens_token', data.token)
   localStorage.setItem('projectlens_user', JSON.stringify(data.user))
-  activeProject.value = getActiveWorkspace(data.user)
+  try {
+    const projects = await refreshWorkspaceProjects(data.user)
+    activeProject.value = getActiveWorkspace(data.user) || projects[0] || null
+    if (activeProject.value) setActiveWorkspace(data.user, activeProject.value)
+  } catch { activeProject.value = getActiveWorkspace(data.user) }
   authOpen.value = false; page.value = requestedAdmin && data.user.role === 'admin' ? 'admin' : postAuthPage.value
 }
-function adminAuthenticated(data) {
-  authenticated(data)
+async function adminAuthenticated(data) {
+  await authenticated(data)
   page.value = 'admin'
   history.replaceState({}, '', '/admin')
 }
@@ -94,6 +99,22 @@ function syncVisibleSession() { if (document.visibilityState === 'visible') sync
 function syncActiveProject(event) { activeProject.value = event?.detail || (user.value ? getActiveWorkspace(user.value) : null) }
 function syncBackToTop() { showBackToTop.value = window.scrollY > 520 }
 function backToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }) }
+function setupRevealAnimations() {
+  revealObserver?.disconnect()
+  revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return
+      entry.target.classList.add('is-revealed')
+      revealObserver?.unobserve(entry.target)
+    })
+  }, { threshold: 0.08, rootMargin: '0px 0px -36px' })
+  document.querySelectorAll('.portal-nav, .portal-hero > *, .portal main > section, .console-header, .console-content-page > *, .pricing-main > *, .admin-login-page > *, .admin-console > *').forEach((element, index) => {
+    element.classList.add('reveal-on-scroll')
+    element.style.setProperty('--reveal-delay', `${Math.min(index % 4, 3) * 55}ms`)
+    revealObserver.observe(element)
+  })
+}
+watch(page, () => nextTick(() => window.setTimeout(setupRevealAnimations, 30)), { flush: 'post' })
 onMounted(() => {
   if (!token.value && !requestedAdmin && page.value !== 'pricing') page.value = 'portal'
   window.addEventListener('storage', syncSession)
@@ -103,6 +124,7 @@ onMounted(() => {
   window.addEventListener('scroll', syncBackToTop, { passive: true })
   syncBackToTop()
   initializeAliyunCaptcha().catch((error) => console.error(error))
+  nextTick(setupRevealAnimations)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('storage', syncSession)
@@ -110,6 +132,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', syncVisibleSession)
   window.removeEventListener('projectlens:active-project-changed', syncActiveProject)
   window.removeEventListener('scroll', syncBackToTop)
+  revealObserver?.disconnect()
 })
 </script>
 

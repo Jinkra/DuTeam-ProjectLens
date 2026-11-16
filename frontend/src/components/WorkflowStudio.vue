@@ -39,6 +39,7 @@ import {
   X,
 } from "lucide-vue-next";
 import AppShell from "./AppShell.vue";
+import { syncWorkflowState } from "../projectStorage";
 import { api } from "../api";
 import ProjectContextBar from "./ProjectContextBar.vue";
 
@@ -276,7 +277,8 @@ function workflowStorageKey() {
 }
 function restoreWorkflow() {
   try {
-    const raw = window.localStorage.getItem(workflowStorageKey());
+    const serverWorkflow = props.project?.workspaceState?.workflow;
+    const raw = serverWorkflow ? JSON.stringify(serverWorkflow) : window.localStorage.getItem(workflowStorageKey());
     if (!raw) return false;
     const saved = JSON.parse(raw);
     if (!Array.isArray(saved.nodes) || !Array.isArray(saved.edges))
@@ -874,21 +876,23 @@ function onFlowInit(instance) {
     else instance.fitView({ padding: 0.12, duration: 260 });
   }, 80);
 }
-function saveWorkflow(options = {}) {
+async function saveWorkflow(options = {}) {
   try {
     const savedAt = new Date();
+    const snapshot = {
+      version: 1,
+      nodes: cloneGraphValue(nodes.value),
+      edges: cloneGraphValue(edges.value),
+      viewport: flowInstance.value?.getViewport?.() || null,
+      reviewResult: cloneGraphValue(reviewResult.value),
+      latestReport: cloneGraphValue(latestReport.value),
+      savedAt: savedAt.toISOString(),
+    };
     window.localStorage.setItem(
       workflowStorageKey(),
-      JSON.stringify({
-        version: 1,
-        nodes: cloneGraphValue(nodes.value),
-        edges: cloneGraphValue(edges.value),
-        viewport: flowInstance.value?.getViewport?.() || null,
-        reviewResult: cloneGraphValue(reviewResult.value),
-        latestReport: cloneGraphValue(latestReport.value),
-        savedAt: savedAt.toISOString(),
-      }),
+      JSON.stringify(snapshot),
     );
+    await syncWorkflowState(props.user, props.project?.id, snapshot);
     autoSaveState.value = `已自动保存 ${savedAt.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
     if (!options.silent && !options.automatic)
       runMessage.value = `已保存 · ${savedAt.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;

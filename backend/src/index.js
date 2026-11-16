@@ -93,7 +93,7 @@ app.use(cors({
     callback(allowed ? null : new Error(`CORS blocked origin: ${origin}`), allowed)
   },
 }))
-app.use(express.json({ limit: '2mb' }))
+app.use(express.json({ limit: '12mb' }))
 
 app.get('/api/health', async (_req, res) => {
   const providers = await getAiProviders()
@@ -347,12 +347,12 @@ app.get('/api/projects', requireAuth, async (req, res) => {
 })
 
 app.post('/api/projects', requireAuth, async (req, res) => {
-  const { name, category, description, material, status, clientId } = req.body
+  const { name, category, description, material, status, clientId, workspaceState } = req.body
   if (!name?.trim() || !description?.trim()) return res.status(400).json({ message: '项目名称和简介不能为空。' })
   const project = await updateStore((data) => {
     const now = new Date().toISOString()
     const reusableClientId = typeof clientId === 'string' && /^project-[a-zA-Z0-9-]{6,80}$/.test(clientId) && !data.projects.some((entry) => entry.id === clientId)
-    const item = { id: reusableClientId ? clientId : crypto.randomUUID(), userId: req.user.sub, name: name.trim(), category: category || 'AI Web应用', description: description.trim(), material: material?.trim() || '', status: status || '草稿', review: null, createdAt: now, updatedAt: now, lastOpenedAt: now }
+    const item = { id: reusableClientId ? clientId : crypto.randomUUID(), userId: req.user.sub, name: name.trim(), category: category || 'AI Web应用', description: description.trim(), material: material?.trim() || '', status: status || '草稿', workspaceState: workspaceState && typeof workspaceState === 'object' ? workspaceState : {}, review: null, createdAt: now, updatedAt: now, lastOpenedAt: now }
     data.projects.push(item)
     return item
   })
@@ -360,7 +360,7 @@ app.post('/api/projects', requireAuth, async (req, res) => {
 })
 
 app.put('/api/projects/:id', requireAuth, async (req, res) => {
-  const { name, category, description, material, status, lastOpenedAt } = req.body
+  const { name, category, description, material, status, lastOpenedAt, workspaceState } = req.body
   const project = await updateStore((data) => {
     const item = data.projects.find((entry) => entry.id === req.params.id && entry.userId === req.user.sub)
     if (!item) return null
@@ -373,6 +373,7 @@ app.put('/api/projects/:id', requireAuth, async (req, res) => {
     if (material !== undefined) item.material = material?.trim() || ''
     if (status !== undefined) item.status = status
     if (lastOpenedAt !== undefined) item.lastOpenedAt = lastOpenedAt
+    if (workspaceState !== undefined && workspaceState && typeof workspaceState === 'object') item.workspaceState = { ...(item.workspaceState || {}), ...workspaceState }
     item.updatedAt = new Date().toISOString()
     return item
   })

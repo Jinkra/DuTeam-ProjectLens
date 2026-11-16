@@ -61,9 +61,10 @@ export async function refreshWorkspaceProjects(user) {
   if (localOnlyProjects.length) {
     const migrated = []
     for (const project of localOnlyProjects) {
+      const localWorkflow = localStorage.getItem(`projectlens_${accountId(user)}_${project.id}_workflow`)
       migrated.push(await api('/projects', {
         method: 'POST',
-        body: JSON.stringify({ clientId: project.id, name: project.name, category: project.category, description: project.description || '暂无项目简介', status: project.status || '草稿' }),
+        body: JSON.stringify({ clientId: project.id, name: project.name, category: project.category, description: project.description || '暂无项目简介', status: project.status || '草稿', workspaceState: localWorkflow ? { workflow: JSON.parse(localWorkflow) } : {} }),
       }))
     }
     projects = [...migrated, ...projects]
@@ -71,6 +72,14 @@ export async function refreshWorkspaceProjects(user) {
 
   saveAccountProjects('workspace', user, projects)
   return projects
+}
+
+export async function syncWorkflowState(user, projectId, workflow) {
+  if (!projectId || projectId === 'default') return null
+  return api(`/projects/${projectId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ workspaceState: { workflow } }),
+  })
 }
 
 export function getActiveWorkspace(user) {

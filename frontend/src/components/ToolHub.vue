@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ArrowRight, BarChart3, BookOpenCheck, Bot, Clock3, FileSearch, GitBranch, MessageCircleMore, Plus, Workflow } from 'lucide-vue-next'
 import AppShell from './AppShell.vue'
-import { loadAccountProjects } from '../projectStorage'
+import { loadAccountProjects, refreshWorkspaceProjects } from '../projectStorage'
 const props = defineProps({ user: Object, embedded: Boolean }); defineEmits(['navigate', 'logout'])
 const tools = [
   { id: 'projects', icon: FileSearch, class: 'tool-blue', name: '项目智能评审', text: '进入项目空间，按竞赛标准分析材料并持续改进。', status: '可用', action: '进入项目空间' },
@@ -21,7 +21,11 @@ function refreshProjects() {
     review: [],
   }
 }
-onMounted(() => { refreshProjects(); window.addEventListener('projectlens:projects-changed', refreshProjects) })
+onMounted(async () => {
+  refreshProjects()
+  try { projectGroups.value.workflow = await refreshWorkspaceProjects(props.user) } catch { /* 使用本地缓存作为离线回退。 */ }
+  window.addEventListener('projectlens:projects-changed', refreshProjects)
+})
 onBeforeUnmount(() => window.removeEventListener('projectlens:projects-changed', refreshProjects))
 </script>
 <template>
