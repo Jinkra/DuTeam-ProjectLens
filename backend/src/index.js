@@ -308,14 +308,49 @@ app.get('/api/projects', requireAuth, async (req, res) => {
 })
 
 app.post('/api/projects', requireAuth, async (req, res) => {
-  const { name, category, description, material } = req.body
+  const { name, category, description, material, status, clientId } = req.body
   if (!name?.trim() || !description?.trim()) return res.status(400).json({ message: '项目名称和简介不能为空。' })
   const project = await updateStore((data) => {
-    const item = { id: crypto.randomUUID(), userId: req.user.sub, name: name.trim(), category: category || 'AI Web应用', description: description.trim(), material: material?.trim() || '', review: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+    const now = new Date().toISOString()
+    const reusableClientId = typeof clientId === 'string' && /^project-[a-zA-Z0-9-]{6,80}$/.test(clientId) && !data.projects.some((entry) => entry.id === clientId)
+    const item = { id: reusableClientId ? clientId : crypto.randomUUID(), userId: req.user.sub, name: name.trim(), category: category || 'AI Web应用', description: description.trim(), material: material?.trim() || '', status: status || '草稿', review: null, createdAt: now, updatedAt: now, lastOpenedAt: now }
     data.projects.push(item)
     return item
   })
   res.status(201).json(project)
+})
+
+app.put('/api/projects/:id', requireAuth, async (req, res) => {
+  const { name, category, description, material, status, lastOpenedAt } = req.body
+  const project = await updateStore((data) => {
+    const item = data.projects.find((entry) => entry.id === req.params.id && entry.userId === req.user.sub)
+    if (!item) return null
+    if (name !== undefined) {
+      if (!name?.trim()) return { validationError: '项目名称不能为空。' }
+      item.name = name.trim()
+    }
+    if (description !== undefined) item.description = description.trim()
+    if (category !== undefined) item.category = category
+    if (material !== undefined) item.material = material?.trim() || ''
+    if (status !== undefined) item.status = status
+    if (lastOpenedAt !== undefined) item.lastOpenedAt = lastOpenedAt
+    item.updatedAt = new Date().toISOString()
+    return item
+  })
+  if (!project) return res.status(404).json({ message: '没有找到该项目。' })
+  if (project.validationError) return res.status(400).json({ message: project.validationError })
+  res.json(project)
+})
+
+app.delete('/api/projects/:id', requireAuth, async (req, res) => {
+  const deleted = await updateStore((data) => {
+    const index = data.projects.findIndex((entry) => entry.id === req.params.id && entry.userId === req.user.sub)
+    if (index < 0) return false
+    data.projects.splice(index, 1)
+    return true
+  })
+  if (!deleted) return res.status(404).json({ message: '没有找到该项目。' })
+  res.json({ success: true })
 })
 
 app.post('/api/projects/:id/review', requireAuth, async (req, res) => {
