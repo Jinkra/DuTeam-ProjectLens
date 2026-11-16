@@ -15,6 +15,7 @@ import ProjectAssistant from './components/ProjectAssistant.vue'
 import WorkspaceProjects from './components/WorkspaceProjects.vue'
 import AccountMembership from './components/AccountMembership.vue'
 import { getActiveWorkspace, loadAccountProjects } from './projectStorage'
+import { ArrowUp } from 'lucide-vue-next'
 
 const token = ref(localStorage.getItem('projectlens_token'))
 const user = ref(JSON.parse(localStorage.getItem('projectlens_user') || 'null'))
@@ -28,6 +29,7 @@ const postAuthPage = ref('tools')
 const requestedProjectTool = ref(null)
 const consolePages = new Set(['tools', 'projects', 'membership', 'workflow-projects', 'review-projects', 'workflow', 'review', 'analysis', 'coach', 'assistant'])
 const activeProject = ref(user.value ? getActiveWorkspace(user.value) : null)
+const showBackToTop = ref(false)
 const isConsolePage = computed(() => consolePages.has(page.value))
 const consoleMeta = computed(() => ({
   tools: { active: 'tools', title: '工具中心', subtitle: '选择一个工具，开始处理你的项目。' },
@@ -89,18 +91,23 @@ function syncSession() {
 }
 function syncVisibleSession() { if (document.visibilityState === 'visible') syncSession() }
 function syncActiveProject(event) { activeProject.value = event?.detail || (user.value ? getActiveWorkspace(user.value) : null) }
+function syncBackToTop() { showBackToTop.value = window.scrollY > 520 }
+function backToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }) }
 onMounted(() => {
   if (!token.value && !requestedAdmin && page.value !== 'pricing') page.value = 'portal'
   window.addEventListener('storage', syncSession)
   window.addEventListener('pageshow', syncSession)
   document.addEventListener('visibilitychange', syncVisibleSession)
   window.addEventListener('projectlens:active-project-changed', syncActiveProject)
+  window.addEventListener('scroll', syncBackToTop, { passive: true })
+  syncBackToTop()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('storage', syncSession)
   window.removeEventListener('pageshow', syncSession)
   document.removeEventListener('visibilitychange', syncVisibleSession)
   window.removeEventListener('projectlens:active-project-changed', syncActiveProject)
+  window.removeEventListener('scroll', syncBackToTop)
 })
 </script>
 
@@ -129,4 +136,7 @@ onBeforeUnmount(() => {
     </div>
   </Transition>
   <AuthModal v-if="authOpen" :initial-mode="authMode" @close="authOpen = false" @authenticated="authenticated" />
+  <Transition name="back-to-top">
+    <button v-if="showBackToTop" class="back-to-top-button" type="button" title="返回顶部" aria-label="返回页面顶部" @click="backToTop"><ArrowUp :size="19" /></button>
+  </Transition>
 </template>
