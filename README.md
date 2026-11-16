@@ -1,9 +1,10 @@
 # DuTeam ProjectLens
 
 面向大学生竞赛与课程项目的证据驱动型 AI 评审与改进 Agent。
-项目演示地址：https://dtpl.slatt.cn
 
 ProjectLens 通过 Agent 工作流分析项目材料，按照 AI Web 竞赛评分维度生成可解释评分、证据引用、问题诊断和改进路线。没有配置模型密钥时，系统会使用内置演示评审，便于本地开发和比赛展示。
+
+## 项目演示地址：https://dtpl.slatt.cn
 
 ## 功能
 
