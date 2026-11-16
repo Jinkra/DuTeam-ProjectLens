@@ -1,12 +1,18 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Blocks, Bot, ChevronDown, CircleUserRound, Crown, FolderKanban, Home, LayoutGrid, LogOut, MessageCircleMore, TrendingUp, Workflow } from 'lucide-vue-next'
+import { api } from '../api'
 import SiteFooter from './SiteFooter.vue'
 const props = defineProps({ user: Object, active: String, title: String, subtitle: String, full: Boolean })
 defineEmits(['navigate', 'logout'])
 const navIndex = computed(() => props.active === 'tools' ? 0 : props.active === 'projects' ? 1 : props.active === 'assistant' ? 2 : props.active === 'membership' ? 3 : ['workflow', 'workflow-projects'].includes(props.active) ? 4 : ['review', 'review-projects'].includes(props.active) ? 5 : props.active === 'analysis' ? 6 : 7)
 const navOffset = computed(() => navIndex.value * 46 + (navIndex.value >= 4 ? 26 : 0))
 const projectTool = computed(() => ['review', 'analysis', 'coach', 'assistant'].includes(props.active))
+const currentPlan = ref(props.user?.plan || 'free')
+const planLabel = computed(() => ({ free: 'Free', pro: 'Pro', team: 'Team' }[currentPlan.value] || 'Free'))
+onMounted(async () => {
+  try { currentPlan.value = (await api('/membership')).plan || currentPlan.value } catch { /* Keep the login snapshot when membership refresh is unavailable. */ }
+})
 </script>
 <template>
   <div class="console-shell" :class="{ 'console-full': full, 'console-project-tool': projectTool }">
@@ -16,6 +22,6 @@ const projectTool = computed(() => ['review', 'analysis', 'coach', 'assistant'].
       <div class="console-home-action"><button @click="$emit('navigate', 'portal')"><Home :size="18" />返回首页</button></div>
       <div class="console-user"><CircleUserRound :size="30" /><div><strong>{{ user?.name }}</strong><small>个人工作空间</small></div><button title="退出登录" @click="$emit('logout')"><LogOut :size="16" /></button></div>
     </aside>
-    <section class="console-main"><header class="console-header"><div><h1>{{ title }}</h1><p>{{ subtitle }}</p></div><div class="workspace-switch"><span>DuTeam Workspace</span><ChevronDown :size="14" /></div></header><slot /><SiteFooter /></section>
+    <section class="console-main"><header class="console-header"><div><h1>{{ title }}</h1><p>{{ subtitle }}</p></div><div class="console-header-actions"><button class="plan-badge" :class="`plan-${currentPlan}`" title="查看会员套餐" @click="$emit('navigate', 'membership')"><Crown :size="13" />{{ planLabel }}会员</button><div class="workspace-switch"><span>DuTeam Workspace</span><ChevronDown :size="14" /></div></div></header><slot /><SiteFooter /></section>
   </div>
 </template>

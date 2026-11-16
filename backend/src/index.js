@@ -30,7 +30,7 @@ const planLimits = {
 }
 
 function publicUser(user) {
-  return { id: user.id, name: user.name, username: user.username || null, email: user.email, role: user.role || (adminEmails.includes(user.email) ? 'admin' : 'user') }
+  return { id: user.id, name: user.name, username: user.username || null, email: user.email, role: user.role || (adminEmails.includes(user.email) ? 'admin' : 'user'), plan: user.plan || 'free' }
 }
 
 async function ensureDefaultAdmin() {
