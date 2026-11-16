@@ -563,7 +563,7 @@ onMounted(load);
                     placeholder="模型ID"
                   /><button
                     class="button button-ghost"
-                    :disabled="providerBusy"
+                    :disabled="providerBusy !== ''"
                     @click="fetchModels(provider)"
                   >
                     {{
@@ -584,7 +584,7 @@ onMounted(load);
                 <span>{{ providerMessages[provider.id] }}</span
                 ><button
                   class="button button-ghost"
-                  :disabled="providerBusy"
+                  :disabled="providerBusy !== ''"
                   @click="testProvider(provider)"
                 >
                   {{
@@ -594,7 +594,7 @@ onMounted(load);
                   }}</button
                 ><button
                   class="button button-primary"
-                  :disabled="providerBusy"
+                  :disabled="providerBusy !== ''"
                   @click="saveProvider(provider)"
                 >
                   {{
