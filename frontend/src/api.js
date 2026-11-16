@@ -1,4 +1,4 @@
-const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4100/api'
+const baseUrl = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:4100/api' : '/api')
 
 export async function api(path, options = {}) {
   const token = localStorage.getItem('projectlens_token')
