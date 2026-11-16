@@ -7,7 +7,22 @@ const dimensions = [
   ['value', '社会价值与商业潜力', 10],
 ]
 
-async function aiReview(project, provider) {
+function extractJson(content) {
+  const cleaned = String(content || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  const start = cleaned.indexOf('{')
+  const end = cleaned.lastIndexOf('}')
+  if (start < 0 || end <= start) throw new Error('模型没有返回可识别的JSON对象。')
+  return JSON.parse(cleaned.slice(start, end + 1))
+}
+
+function validateReview(review) {
+  if (!Number.isFinite(Number(review.total)) || !Array.isArray(review.dimensions) || !Array.isArray(review.findings) || !Array.isArray(review.evidence)) {
+    throw new Error('模型返回的评审结构不完整。')
+  }
+  return { ...review, total: Number(review.total), mode: 'ai' }
+}
+
+async function requestReview(project, provider, retry = false) {
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
     signal: AbortSignal.timeout(80000),
@@ -15,10 +30,10 @@ async function aiReview(project, provider) {
     body: JSON.stringify({
       model: provider.model,
       temperature: 0.2,
-      max_tokens: 2400,
+      max_tokens: retry ? 3200 : 2600,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: '你是高校AI竞赛评审专家。必须完全依据用户提供的项目简介和材料正文进行评审，评分、结论、证据、改进建议和下一步均由你本次分析生成，禁止套用固定模板或编造未出现的事实。所有总分和维度分均使用0到100分制。仅输出JSON，字段必须为total, summary, dimensions, findings, evidence, nextSteps。dimensions必须覆盖给定六个维度并包含key,label,weight,score；findings包含level,title,evidence,action；evidence包含dimension,quote,source，quote必须是材料中的原文短句。如果材料不足，须具体指出缺失内容及其对评分的影响。' },
+        { role: 'system', content: `你是高校AI竞赛评审专家。必须完全依据项目材料评审，禁止固定模板和编造事实。只输出一个完整JSON对象，不得输出Markdown代码块或解释。字段为total,summary,dimensions,findings,evidence,nextSteps。dimensions必须包含六项且每项为key,label,weight,score；findings最多4项且包含level,title,evidence,action；evidence最多6项且包含dimension,quote,source；nextSteps最多5项。所有分数为0到100。${retry ? '上次输出不是合法JSON，本次必须缩短文字并确保所有引号、数组和大括号完整闭合。' : ''}` },
         { role: 'user', content: JSON.stringify({ rubric: dimensions, project }) },
       ],
     }),
@@ -27,12 +42,20 @@ async function aiReview(project, provider) {
   const data = await response.json()
   const content = data.choices?.[0]?.message?.content
   if (!content) throw new Error('模型没有返回评审内容。')
-  const review = JSON.parse(content)
-  if (!Number.isFinite(Number(review.total)) || !Array.isArray(review.dimensions) || !Array.isArray(review.findings) || !Array.isArray(review.evidence)) {
-    throw new Error('模型返回的评审结构不完整。')
-  }
-  return { ...review, total: Number(review.total), mode: 'ai' }
+  if (data.choices?.[0]?.finish_reason === 'length') throw new Error('模型输出达到长度上限，JSON未完整生成。')
+  return validateReview(extractJson(content))
 }
+
+async function aiReview(project, provider) {
+  try {
+    return await requestReview(project, provider)
+  } catch (error) {
+    if (!/JSON|结构|长度上限/.test(error.message)) throw error
+    return requestReview(project, provider, true)
+  }
+}
+
+export { extractJson, validateReview }
 
 export async function createReview(project, provider) {
   if (!provider?.configured) throw new Error('当前模型尚未配置，无法执行AI评审。')
