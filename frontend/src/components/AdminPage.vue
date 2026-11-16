@@ -115,9 +115,7 @@ async function fetchModels(provider) {
         apiKey: provider.apiKey,
       }),
     });
-    provider.models = result.models;
-    if (result.models.length && !result.models.includes(provider.model))
-      provider.model = result.models[0];
+    provider.models = [...new Set(result.models)];
     providerMessages.value = {
       ...providerMessages.value,
       [provider.id]: `获取到${result.models.length}个模型`,
@@ -149,6 +147,11 @@ async function testProvider(provider) {
   } finally {
     providerBusy.value = "";
   }
+}
+function providerModelOptions(provider) {
+  return [
+    ...new Set([provider.model, ...(provider.models || [])].filter(Boolean)),
+  ];
 }
 async function loginAdmin() {
   loggingIn.value = true;
@@ -531,10 +534,10 @@ onMounted(load);
             <article v-for="provider in aiProviders" :key="provider.id">
               <header>
                 <div>
-                  <strong>{{ provider.label }}</strong
-                  ><small :class="{ configured: provider.configured }">{{
-                    provider.configured ? "已配置" : "暂未开放"
-                  }}</small>
+                  <strong>{{ provider.label }}</strong><small
+                    :class="{ configured: provider.configured }"
+                    >{{ provider.configured ? "已配置" : "暂未开放" }}</small
+                  >
                 </div>
                 <label class="config-toggle"
                   ><input v-model="provider.enabled" type="checkbox" /><span
@@ -557,11 +560,15 @@ onMounted(load);
               <label
                 >默认模型
                 <div class="admin-model-row">
-                  <input
-                    v-model.trim="provider.model"
-                    :list="`${provider.id}-models`"
-                    placeholder="模型ID"
-                  /><button
+                  <select v-model="provider.model">
+                    <option
+                      v-for="model in providerModelOptions(provider)"
+                      :key="model"
+                      :value="model"
+                    >
+                      {{ model }}
+                    </option></select
+                  ><button
                     class="button button-ghost"
                     :disabled="providerBusy !== ''"
                     @click="fetchModels(provider)"
@@ -573,16 +580,10 @@ onMounted(load);
                     }}
                   </button>
                 </div>
-                <datalist :id="`${provider.id}-models`">
-                  <option
-                    v-for="model in provider.models"
-                    :key="model"
-                    :value="model"
-                  /></datalist
-              ></label>
+                ></label
+              >
               <footer>
-                <span>{{ providerMessages[provider.id] }}</span
-                ><button
+                <span>{{ providerMessages[provider.id] }}</span><button
                   class="button button-ghost"
                   :disabled="providerBusy !== ''"
                   @click="testProvider(provider)"
