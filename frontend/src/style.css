@@ -219,3 +219,6 @@
 
 /* Page-load and scroll reveal motion */
 .reveal-on-scroll{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.22,.61,.36,1) var(--reveal-delay,0ms),transform .75s cubic-bezier(.22,.61,.36,1) var(--reveal-delay,0ms)}.reveal-on-scroll.is-revealed{opacity:1;transform:none}@media(prefers-reduced-motion:reduce){.reveal-on-scroll,.reveal-on-scroll.is-revealed{opacity:1;transform:none;transition:none}}
+
+/* Keep the portal preview grid from overriding the real iteration-analysis layout. */
+.analysis-page .analysis-grid{position:static;inset:auto;grid-template-rows:none;grid-template-columns:1.45fr .85fr}.analysis-page .analysis-grid>article{position:relative}.analysis-page .analysis-grid i{border-top:0}@media(max-width:950px){.analysis-page .analysis-grid{grid-template-columns:1fr}}
