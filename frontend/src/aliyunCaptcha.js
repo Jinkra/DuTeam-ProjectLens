@@ -6,6 +6,7 @@ const CAPTCHA_HOST = 'dtpl.slatt.cn'
 let captchaInstance = null
 let initialization = null
 let pendingVerification = null
+let closeTimer = null
 
 function requiresCaptcha() {
   return window.location.hostname === CAPTCHA_HOST
@@ -44,8 +45,11 @@ export function initializeAliyunCaptcha() {
       language: 'cn',
       timeout: 5000,
       slideStyle: { width: 360, height: 40 },
+      delayBeforeSuccess: false,
       success(captchaVerifyParam) {
         if (!pendingVerification) return
+        if (closeTimer) window.clearTimeout(closeTimer)
+        closeTimer = null
         pendingVerification.resolve(captchaVerifyParam)
         pendingVerification = null
       },
@@ -58,8 +62,13 @@ export function initializeAliyunCaptcha() {
       },
       onClose() {
         if (!pendingVerification) return
-        pendingVerification.reject(new Error('安全验证已取消。'))
-        pendingVerification = null
+        if (closeTimer) window.clearTimeout(closeTimer)
+        closeTimer = window.setTimeout(() => {
+          if (!pendingVerification) return
+          pendingVerification.reject(new Error('安全验证已取消。'))
+          pendingVerification = null
+          closeTimer = null
+        }, 600)
       },
       onError(errorInfo) {
         console.error('阿里云AI验证码初始化失败', errorInfo)
@@ -81,6 +90,8 @@ export async function verifyWithAliyunCaptcha() {
   if (pendingVerification) throw new Error('安全验证正在进行，请完成后再试。')
 
   return new Promise((resolve, reject) => {
+    if (closeTimer) window.clearTimeout(closeTimer)
+    closeTimer = null
     pendingVerification = { resolve, reject }
     const trigger = document.querySelector('#aliyun-captcha-trigger')
     if (!trigger) {
