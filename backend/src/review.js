@@ -77,8 +77,14 @@ function reviewModel(provider) {
   return model
 }
 
-async function requestReview(project, provider, retry = false) {
+const reviewAttempts = [
+  { maxTokens: 3200, compact: false },
+  { maxTokens: 5000, compact: true },
+]
+
+async function requestReview(project, provider, attempt = 0) {
   const model = reviewModel(provider)
+  const settings = reviewAttempts[Math.min(attempt, reviewAttempts.length - 1)]
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
     signal: AbortSignal.timeout(80000),
@@ -86,10 +92,10 @@ async function requestReview(project, provider, retry = false) {
     body: JSON.stringify({
       model,
       temperature: 0.1,
-      max_tokens: retry ? 1800 : 1400,
+      max_tokens: settings.maxTokens,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: `你是高校AI竞赛评审专家。必须完全依据项目材料评审，禁止固定模板和编造事实。只输出一个完整JSON对象，不得输出Markdown代码块或解释。字段为total,summary,dimensions,findings,evidence,nextSteps。dimensions必须包含六项且每项为key,label,weight,score；findings最多4项且包含level,title,evidence,action；evidence最多6项且包含dimension,quote,source；nextSteps最多5项。所有分数为0到100。${retry ? '上次输出不是合法JSON，本次必须缩短文字并确保所有引号、数组和大括号完整闭合。' : ''}` },
+        { role: 'system', content: `你是高校AI竞赛评审专家。必须完全依据项目材料评审，禁止固定模板和编造事实。只输出一个完整JSON对象，不得输出Markdown代码块或解释。字段为total,summary,dimensions,findings,evidence,nextSteps。dimensions必须包含六项且每项为key,label,weight,score；findings最多4项且包含level,title,evidence,action；evidence最多6项且包含dimension,quote,source；nextSteps最多5项。所有分数为0到100。为确保JSON完整：summary不超过180个汉字；每项title不超过30字，evidence和action分别不超过120字；quote不超过80字；每条nextSteps不超过100字。${settings.compact ? '上次输出被截断或结构无效。本次使用紧凑表达，findings最多3项、evidence最多4项、nextSteps最多4项，优先保证JSON完整闭合。' : ''}` },
         { role: 'user', content: JSON.stringify({ rubric: dimensions, project: prepareProject(project) }) },
       ],
     }),
@@ -109,10 +115,10 @@ async function requestReview(project, provider, retry = false) {
 
 async function aiReview(project, provider) {
   try {
-    return await requestReview(project, provider)
+    return await requestReview(project, provider, 0)
   } catch (error) {
     if (!/JSON|结构|长度上限|没有返回评审内容/.test(error.message)) throw error
-    return requestReview(project, provider, true)
+    return requestReview(project, provider, 1)
   }
 }
 
