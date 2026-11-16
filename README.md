@@ -27,7 +27,7 @@ ProjectLens 通过 Agent 工作流分析项目材料，按照 AI Web 竞赛评�
 
 - Web：Vue 3、Vite、XYFlow、Lucide Icons
 - API：Node.js、Express、JWT、bcryptjs
-- 数据：本地 JSON 存储（首版 Demo）
+- 数据：SQLite（`backend/data/database.db`）
 - AI：OpenAI-compatible Chat Completions API
 
 ## 本地运行
@@ -56,7 +56,7 @@ ADMIN_PASSWORD=admin123
 ADMIN_EMAIL=admin@projectlens.local
 ```
 
-模型API地址、密钥与默认模型在管理后台的“模型API配置”中设置，支持DeepSeek Auto、ChatGPT Auto和Qwen Auto。配置保存在已被Git忽略的`backend/data/store.json`，管理接口只返回密钥脱敏预览。请勿将该数据文件提交到公开仓库。
+模型API地址、密钥与默认模型在管理后台的“模型API配置”中设置，支持DeepSeek Auto、ChatGPT Auto和Qwen Auto。配置保存在已被Git忽略的`backend/data/database.db`，管理接口只返回密钥脱敏预览。请勿将数据库文件提交到公开仓库。
 
 `ADMIN_EMAILS` 支持配置多个逗号分隔的管理员邮箱。管理员登录后可直接访问 `http://localhost:5173/admin`。
 
@@ -83,9 +83,9 @@ npm install
 npm run dev
 ```
 
-## 当前 Demo 边界
+## 当前部署边界
 
-首版仅支持文本与 Markdown 材料；本地 JSON 存储用于快速演示，不适合多实例生产部署。后续可升级为 PostgreSQL、对象存储、向量数据库和异步评审任务。
+当前支持文本与Markdown材料。SQLite适用于单实例部署；多实例或高并发部署建议升级为PostgreSQL，并配套对象存储、向量数据库和异步评审任务。
 
 ## License
 

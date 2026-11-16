@@ -69,6 +69,6 @@ const capabilities = [
 
       <section class="portal-cta shell-width"><div><span><Crown :size="20" /></span><div><small>MEMBERSHIP & USAGE</small><h2>根据团队使用强度选择会员方案</h2><p>会员中心可公开查看，购买操作需要登录；当前付款功能暂未开放。</p></div></div><button class="button button-light" @click="$emit('navigate', 'pricing')">查看会员方案<ArrowRight :size="16" /></button></section>
     </main>
-    <SiteFooter />
+    <SiteFooter show-disclaimer />
   </div>
 </template>
