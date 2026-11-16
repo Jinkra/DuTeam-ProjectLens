@@ -1,6 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { ArrowRight, BarChart3, Blocks, Bot, Check, ChevronRight, CirclePlay, Crown, Database, FileOutput, FileSearch, FileText, FolderKanban, Gauge, MessageCircleMore, MessageSquareText, Mic2, Settings, Sparkles, Upload, Users, Workflow } from 'lucide-vue-next'
+import { ArrowRight, BarChart3, Blocks, Bot, Check, ChevronRight, CirclePlay, Crown, Database, FileOutput, FileSearch, FileText, FolderKanban, Gauge, GraduationCap, MessageCircleMore, MessageSquareText, Mic2, Settings, Sparkles, Trophy, Upload, UserRoundCheck, Users, Workflow } from 'lucide-vue-next'
 import SiteFooter from './SiteFooter.vue'
 
 defineProps({ user: Object })
@@ -38,6 +38,20 @@ const capabilities = [
   { icon: Gauge, title: '会员与用量控制', text: '按4小时、24小时和总用量统计，不同会员等级使用独立限额。' },
   { icon: Users, title: '独立管理后台', text: '统一管理用户、会员订阅、到期时间、用量与系统运营数据。' },
 ]
+
+const featureGuide = [
+  { id: 'workflow', icon: Workflow, title: '节点式Agent工作台', purpose: '把材料读取、知识检索、模型分析和报告导出编排成可复用流程。', input: '项目文档、知识库、模型配置', output: '可运行工作流与评审报告' },
+  { id: 'review', icon: FileSearch, title: '项目智能评审', purpose: '让AI依据真实材料寻找证据，按照六个维度定位项目优势与风险。', input: '项目简介与材料正文', output: '评分、证据链、改进建议' },
+  { id: 'analysis', icon: BarChart3, title: '迭代效果分析', purpose: '保存每次评审版本，观察改进前后的分数、问题和证据变化。', input: '历次项目评审结果', output: '版本对比与趋势结论' },
+  { id: 'coach', icon: Bot, title: 'AI答辩教练', purpose: '模拟评委追问并实时分析回答质量，帮助团队补齐表达和证据。', input: '当前项目资料与现场回答', output: '结构评分、建议与追问' },
+  { id: 'assistant', icon: MessageCircleMore, title: 'Duts项目AI助手', purpose: '自动读取当前项目、工作流和评审结果，持续回答项目相关问题。', input: '完整项目上下文', output: '带项目依据的连续对话' },
+]
+
+const scenarios = [
+  { icon: Trophy, title: '大学生竞赛团队', text: '在提交作品前检查材料完整度、技术深度和创新表达，并生成答辩准备依据。', points: ['赛前项目体检', '改进任务排序', '模拟评委追问'] },
+  { icon: GraduationCap, title: '课程与毕业项目', text: '将阶段材料和每轮修改持续沉淀，形成可回顾、可比较的项目成长记录。', points: ['阶段成果评审', '版本变化追踪', '课程汇报准备'] },
+  { icon: UserRoundCheck, title: '教师与项目指导', text: '快速了解学生项目现状和材料缺口，把指导时间集中在高影响问题上。', points: ['统一评审维度', '证据化反馈', '团队进度复盘'] },
+]
 </script>
 
 <template>
@@ -63,9 +77,13 @@ const capabilities = [
 
       <section id="product" class="tool-section product-system shell-width"><div class="section-heading"><div><p class="kicker">PROJECT TOOLCHAIN</p><h2>围绕一个项目，完成四类关键工作</h2></div><p>用AI推进项目构建，所有工具共享项目上下文；Duts项目AI助手可随时基于项目资料继续对话。</p></div><div class="portal-tool-grid portal-tool-grid-v2"><button v-for="(tool, index) in tools" :key="tool.id" class="portal-tool-card" @click="user ? $emit('navigate', { page: tool.id, selectProject: true }) : $emit('auth', 'login')"><span class="tool-icon" :class="`tool-${tool.tone}`"><component :is="tool.icon" :size="22" /></span><span class="tool-card-index">0{{ index + 1 }}</span><h3>{{ tool.title }}</h3><p>{{ tool.text }}</p><div><small>{{ tool.meta }}</small><ArrowRight :size="17" /></div></button></div></section>
 
+      <section class="feature-guide-section"><div class="shell-width"><div class="section-heading feature-guide-heading"><div><p class="kicker">WHAT EACH TOOL DELIVERS</p><h2>每项能力，都对应明确的项目产出</h2></div><p>不是把AI能力分散成孤立入口，而是围绕同一个项目，把材料、分析、改进和表达训练连接起来。</p></div><div class="feature-guide-table"><header><span>功能</span><span>主要用途</span><span>读取内容</span><span>形成结果</span><i></i></header><button v-for="item in featureGuide" :key="item.id" @click="user ? $emit('navigate', { page: item.id, selectProject: true }) : $emit('auth', 'login')"><span class="feature-guide-name"><i><component :is="item.icon" :size="18" /></i><strong>{{ item.title }}</strong></span><p>{{ item.purpose }}</p><small>{{ item.input }}</small><small>{{ item.output }}</small><ArrowRight :size="16" /></button></div></div></section>
+
       <section id="workspace-flow" class="workspace-flow"><div class="shell-width workspace-flow-inner"><div class="workspace-flow-copy"><p class="kicker">ONE PROJECT, ONE CONTEXT</p><h2>从创建项目开始，结果持续沉淀。</h2><p>项目不是一次性表单，而是工作流、评审结果、版本变化和答辩训练的共同载体。每次操作都回到同一个项目空间。</p><button class="button button-primary" @click="user ? $emit('navigate', 'projects') : $emit('auth', 'register')">进入项目空间<ArrowRight :size="16" /></button></div><ol class="workspace-flow-steps"><li><b>01</b><div><strong>创建项目</strong><p>录入项目方向、简介与基础材料。</p></div></li><li><b>02</b><div><strong>选择工具</strong><p>进入工作流、评审、迭代分析或答辩教练。</p></div></li><li><b>03</b><div><strong>运行与改进</strong><p>查看证据、评分和建议，持续更新项目。</p></div></li><li><b>04</b><div><strong>沉淀成果</strong><p>导出评审报告，为答辩和复盘提供依据。</p></div></li></ol></div></section>
 
       <section class="operations-section shell-width"><div class="section-heading"><div><p class="kicker">PRODUCT OPERATIONS</p><h2>从使用到运营，产品能力完整闭环</h2></div><p>前台负责项目工具与会员体验，后台负责用户、订阅和用量管理，敏感模型配置通过环境变量保留在服务端。</p></div><div class="capability-grid"><article v-for="item in capabilities" :key="item.title"><span><component :is="item.icon" :size="20" /></span><div><h3>{{ item.title }}</h3><p>{{ item.text }}</p></div></article></div></section>
+
+      <section class="portal-scenarios"><div class="shell-width"><div class="section-heading"><div><p class="kicker">WHO IT HELPS</p><h2>从参赛准备到项目指导，都能直接使用</h2></div><p>ProjectLens适合需要持续整理材料、验证项目质量并准备展示表达的学生团队和指导教师。</p></div><div class="scenario-grid"><article v-for="scenario in scenarios" :key="scenario.title"><span><component :is="scenario.icon" :size="22" /></span><h3>{{ scenario.title }}</h3><p>{{ scenario.text }}</p><ul><li v-for="point in scenario.points" :key="point"><Check :size="14" />{{ point }}</li></ul></article></div></div></section>
 
       <section class="portal-cta shell-width"><div><span><Crown :size="20" /></span><div><small>MEMBERSHIP & USAGE</small><h2>根据团队使用强度选择会员方案</h2><p>会员中心可公开查看，购买操作需要登录；当前付款功能暂未开放。</p></div></div><button class="button button-light" @click="$emit('navigate', 'pricing')">查看会员方案<ArrowRight :size="16" /></button></section>
     </main>
