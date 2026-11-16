@@ -73,7 +73,10 @@ const projectContext = computed(() => {
       ...(node.data?.config?.folderFiles || []),
     ]);
     return {
-      materials: [...new Set([...materials, ...attachments.value])],
+      materials: [
+        ...materials,
+        ...attachments.value.map((name) => ({ name, content: '' })),
+      ].filter((item, index, list) => list.findIndex((entry) => (typeof entry === 'string' ? entry : entry.name) === (typeof item === 'string' ? item : item.name)) === index),
       workflowNodes: nodes.map(
         (node) =>
           `${node.data?.label || node.id}：${node.data?.description || ""}`,

@@ -24,12 +24,13 @@ function fallbackAnswer(project, question, context) {
 export async function chatWithProject({ project, question, messages = [], context = {}, preferences = {}, provider }) {
   if (!provider?.configured) return fallbackAnswer(project, question, context)
   const history = messages.slice(-8).map((item) => ({ role: item.role === 'assistant' ? 'assistant' : 'user', content: String(item.content || '').slice(0, 3000) }))
+  const materials = (context.materials || []).slice(0, 30).map((item) => typeof item === 'string' ? { name: item, content: '' } : { name: item.name || '未命名材料', content: String(item.content || '').slice(0, 12000) })
   const projectContext = JSON.stringify({
     name: project?.name,
     category: project?.category,
     description: project?.description,
     status: project?.status,
-    materials: (context.materials || []).slice(0, 30),
+    materials,
     workflowNodes: (context.workflowNodes || []).slice(0, 20),
     workflowReport: context.workflowReport ? {
       title: context.workflowReport.title,
@@ -61,7 +62,7 @@ export async function chatWithProject({ project, question, messages = [], contex
     citations: [
       { label: '项目简介', detail: project?.description || '暂无项目简介' },
       ...(context.workflowReport ? [{ label: '工作流分析报告', detail: `${context.workflowReport.title || '评审报告'} · ${context.workflowReport.total}分` }] : []),
-      ...(context.materials || []).slice(0, 3).map((item) => ({ label: '项目材料', detail: item })),
+      ...materials.slice(0, 3).map((item) => ({ label: '项目材料', detail: item.name })),
     ],
     mode: 'ai',
   }

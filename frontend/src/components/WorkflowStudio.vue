@@ -78,6 +78,12 @@ let workflowReady = false;
 function cloneGraphValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
+function uploadedFileName(file) {
+  return typeof file === "string" ? file : file?.name || "未命名文件";
+}
+function uploadedFileContent(file) {
+  return typeof file === "object" && file?.content ? file.content : "";
+}
 function rememberAction(action) {
   history.value = [...history.value.slice(-39), cloneGraphValue(action)];
 }
@@ -535,7 +541,7 @@ function updateReasoning(level) {
   selectedNode.value.data.config.usageMultiplier = multipliers[level];
   updateSelected();
 }
-function readFileProgress(file, offset, totalSize) {
+function readFileProgress(file, offset, totalSize, readAsText = false) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onprogress = (progress) => {
@@ -545,11 +551,16 @@ function readFileProgress(file, offset, totalSize) {
           Math.round(((offset + progress.loaded) / totalSize) * 100),
         );
     };
-    reader.onload = resolve;
+    reader.onload = () => resolve(readAsText ? String(reader.result || "") : "");
     reader.onerror = () =>
       reject(reader.error || new Error(`无法读取${file.name}`));
-    reader.readAsArrayBuffer(file);
+    if (readAsText) reader.readAsText(file);
+    else reader.readAsArrayBuffer(file);
   });
+}
+function canReadText(file) {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  return file.type.startsWith("text/") || ["txt", "md", "markdown", "json", "csv", "tsv", "js", "ts", "jsx", "tsx", "vue", "html", "css", "py", "java", "c", "cpp", "h", "hpp", "xml", "yaml", "yml", "sql"].includes(extension);
 }
 async function uploadFiles(event, target = "files", useRelativePath = false) {
   const input = event.target;
@@ -564,13 +575,20 @@ async function uploadFiles(event, target = "files", useRelativePath = false) {
   );
   let offset = 0;
   try {
+    const uploadedFiles = [];
     for (const file of files) {
-      await readFileProgress(file, offset, totalSize);
+      const readable = canReadText(file);
+      const content = await readFileProgress(file, offset, totalSize, readable);
       offset += Math.max(1, file.size);
+      uploadedFiles.push({
+        name: useRelativePath ? file.webkitRelativePath || file.name : file.name,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+        readable,
+        content: readable ? content.slice(0, 150000) : "",
+        truncated: readable && content.length > 150000,
+      });
     }
-    const names = files.map((file) =>
-      useRelativePath ? file.webkitRelativePath || file.name : file.name,
-    );
     nodes.value = nodes.value.map((node) =>
       node.id === nodeId
         ? {
@@ -580,7 +598,10 @@ async function uploadFiles(event, target = "files", useRelativePath = false) {
               config: {
                 ...node.data.config,
                 [target]: [
-                  ...new Set([...(node.data.config[target] || []), ...names]),
+                  ...(node.data.config[target] || []).filter(
+                    (existing) => !uploadedFiles.some((file) => uploadedFileName(existing) === file.name),
+                  ),
+                  ...uploadedFiles,
                 ],
               },
             },
@@ -604,7 +625,7 @@ function uploadKnowledgeFiles(event) {
 function uploadInputFiles(event, target = "files") {
   uploadFiles(event, target, target === "folderFiles");
 }
-function removeUploadedFile(nodeId, target, fileName) {
+function removeUploadedFile(nodeId, target, fileToRemove) {
   nodes.value = nodes.value.map((node) =>
     node.id === nodeId
       ? {
@@ -614,14 +635,14 @@ function removeUploadedFile(nodeId, target, fileName) {
             config: {
               ...node.data.config,
               [target]: (node.data.config[target] || []).filter(
-                (file) => file !== fileName,
+                (file) => uploadedFileName(file) !== uploadedFileName(fileToRemove),
               ),
             },
           },
         }
       : node,
   );
-  runMessage.value = `已移除文件：${fileName}`;
+  runMessage.value = `已移除文件：${uploadedFileName(fileToRemove)}`;
 }
 function removeSelected() {
   if (!selectedNode.value) return;
@@ -707,6 +728,13 @@ async function runWorkflow() {
       ...(node.data.config?.files || []),
       ...(node.data.config?.folderFiles || []),
     ]);
+    const readableMaterials = materials.filter((file) => uploadedFileContent(file));
+    const materialText = readableMaterials
+      .map((file) => `【文件：${uploadedFileName(file)}】\n${uploadedFileContent(file)}`)
+      .join("\n\n");
+    const unreadableNames = materials
+      .filter((file) => !uploadedFileContent(file))
+      .map(uploadedFileName);
     reviewResult.value = await api("/reviews/analyze", {
       method: "POST",
       body: JSON.stringify({
@@ -715,9 +743,12 @@ async function runWorkflow() {
           name: props.project?.name || "未命名项目",
           category: props.project?.category,
           description: props.project?.description,
-          material: materials.length
-            ? `已上传材料：${materials.join("、")}`
-            : props.project?.description || "",
+          material: materialText || props.project?.material || props.project?.description || "",
+          materialFiles: materials.map((file) => ({
+            name: uploadedFileName(file),
+            readable: Boolean(uploadedFileContent(file)),
+          })),
+          unreadableFiles: unreadableNames,
         },
       }),
     });
@@ -765,6 +796,7 @@ function buildReport() {
     summary: result.summary,
     dimensions: result.dimensions,
     findings: result.findings,
+    nextSteps: result.nextSteps || [],
     nodes: nodes.value.map((node) => ({
       name: node.data.label,
       type: node.data.kind,
@@ -1163,8 +1195,8 @@ onBeforeUnmount(() => {
                 v-if="selectedNode.data.config.files?.length"
                 class="knowledge-files"
               >
-                <span v-for="file in selectedNode.data.config.files" :key="file"
-                  ><FolderOpen :size="13" /><b>{{ file }}</b
+                <span v-for="file in selectedNode.data.config.files" :key="uploadedFileName(file)"
+                  ><FolderOpen :size="13" /><b>{{ uploadedFileName(file) }}</b
                   ><button
                     title="移除文件"
                     @click="removeUploadedFile(selectedNode.id, 'files', file)"
@@ -1198,8 +1230,8 @@ onBeforeUnmount(() => {
               >
                 <span
                   v-for="file in selectedNode.data.config.folderFiles"
-                  :key="file"
-                  ><FolderOpen :size="13" /><b>{{ file }}</b
+                  :key="uploadedFileName(file)"
+                  ><FolderOpen :size="13" /><b>{{ uploadedFileName(file) }}</b
                   ><button
                     title="移除文件"
                     @click="
@@ -1253,8 +1285,8 @@ onBeforeUnmount(() => {
               v-if="selectedNode.data.config.files.length"
               class="knowledge-files"
             >
-              <span v-for="file in selectedNode.data.config.files" :key="file"
-                ><FolderOpen :size="13" /><b>{{ file }}</b
+              <span v-for="file in selectedNode.data.config.files" :key="uploadedFileName(file)"
+                ><FolderOpen :size="13" /><b>{{ uploadedFileName(file) }}</b
                 ><button
                   title="移除文件"
                   @click="removeUploadedFile(selectedNode.id, 'files', file)"

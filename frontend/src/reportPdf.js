@@ -95,8 +95,9 @@ export async function exportReviewPdf(report) {
   });
   const conclusion = document.createElement("div");
   conclusion.className = "pdf-conclusion";
-  conclusion.innerHTML =
-    "<h2>下一步建议</h2><p>优先补齐高影响问题的证据材料，再针对评分较低的维度进行局部重评。建议保留本报告作为当前版本基线，在下一轮迭代中对比分数、问题关闭率与证据命中率。</p>";
+  conclusion.innerHTML = `<h2>下一步建议</h2><p>${escapeHtml(
+    (report.nextSteps || []).join("；") || "模型本次未返回下一步建议。",
+  )}</p>`;
   appendMeasured(nodeBody, conclusion, () =>
     createContinuationPage("下一步建议", "迭代行动建议"),
   );

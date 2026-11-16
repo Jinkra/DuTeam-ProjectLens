@@ -7,6 +7,7 @@ import { requireAuth, signToken } from './auth.js'
 import { chatWithProject } from './assistant.js'
 import { fetchProviderModels, getAiProvider, getAiProviders, publicProvider, saveAiProvider, testProvider } from './ai-config.js'
 import { createReview } from './review.js'
+import { analyzeDefenseAnswer } from './defense.js'
 import { readStore, updateStore } from './store.js'
 
 const app = express()
@@ -184,13 +185,51 @@ app.post('/api/reviews/analyze', requireAuth, async (req, res) => {
   if (!project?.name?.trim()) return res.status(400).json({ message: '项目名称不能为空。' })
   const provider = await getAiProvider(providerId)
   if (!provider.configured) return res.status(503).json({ message: `暂未开放${provider.label}，请联系管理员完成模型配置。` })
-  const review = await createReview({
-    name: project.name.trim(),
-    category: project.category || 'AI项目',
-    description: project.description || '',
-    material: project.material || '',
-  }, provider)
-  res.json(review)
+  try {
+    const review = await createReview({
+      name: project.name.trim(),
+      category: project.category || 'AI项目',
+      description: project.description || '',
+      material: project.material || '',
+      materialFiles: Array.isArray(project.materialFiles) ? project.materialFiles : [],
+      unreadableFiles: Array.isArray(project.unreadableFiles) ? project.unreadableFiles : [],
+    }, provider)
+    res.json(review)
+  } catch (error) {
+    console.error(error)
+    res.status(502).json({ message: `AI评审失败：${error.message}` })
+  }
+})
+
+app.post('/api/projects/:id/defense/analyze', requireAuth, async (req, res) => {
+  const data = await readStore()
+  const project = data.projects.find((item) => item.id === req.params.id && item.userId === req.user.sub)
+  if (!project) return res.status(404).json({ message: '没有找到该项目。' })
+  const question = String(req.body.question || '').trim()
+  const answer = String(req.body.answer || '').trim()
+  if (!question || !answer) return res.status(400).json({ message: '问题和回答不能为空。' })
+  const provider = await getAiProvider(req.body.providerId || 'deepseek')
+  if (!provider.configured) return res.status(503).json({ message: `暂未开放${provider.label}，请联系管理员完成模型配置。` })
+  const consumed = await consumeUsage(req.user.sub, 2)
+  if (consumed.error) return res.status(consumed.status).json({ message: consumed.error, usage: consumed.usage })
+  try {
+    const analysis = await analyzeDefenseAnswer({
+      project: {
+        name: project.name,
+        category: project.category,
+        description: project.description,
+        material: project.material,
+        workflowReport: req.body.workflowReport || null,
+      },
+      question,
+      answer,
+      provider,
+    })
+    res.json({ ...analysis, usage: consumed.usage })
+  } catch (error) {
+    console.error(error)
+    res.status(502).json({ message: `AI答辩分析失败：${error.message}` })
+  }
 })
 
 app.get('/api/admin/overview', requireAuth, requireAdmin, async (_req, res) => {
@@ -361,7 +400,13 @@ app.post('/api/projects/:id/review', requireAuth, async (req, res) => {
   if (!provider.configured) return res.status(503).json({ message: `暂未开放${provider.label}，请联系管理员完成模型配置。` })
   const consumed = await consumeUsage(req.user.sub)
   if (consumed.error) return res.status(consumed.status).json({ message: consumed.error, usage: consumed.usage })
-  const review = await createReview(project, provider)
+  let review
+  try {
+    review = await createReview(project, provider)
+  } catch (error) {
+    console.error(error)
+    return res.status(502).json({ message: `AI评审失败：${error.message}` })
+  }
   const updated = await updateStore((store) => {
     const target = store.projects.find((item) => item.id === project.id)
     const now = new Date().toISOString()
