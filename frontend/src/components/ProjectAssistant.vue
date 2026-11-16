@@ -16,10 +16,17 @@ import {
   X,
 } from "lucide-vue-next";
 import { api } from "../api";
+import DOMPurify from "dompurify";
+import { marked } from "marked";
 import ProjectContextBar from "./ProjectContextBar.vue";
 
 const props = defineProps({ user: Object, project: Object });
 defineEmits(["navigate"]);
+
+marked.setOptions({ gfm: true, breaks: true });
+function renderMarkdown(content) {
+  return DOMPurify.sanitize(marked.parse(String(content || "")));
+}
 
 const chatKey = computed(
   () =>
@@ -354,7 +361,12 @@ onBeforeUnmount(stopTimer);
                   ><FileText :size="12" />{{ file }}</span
                 >
               </div>
-              <p>{{ message.content }}</p>
+              <div
+                v-if="message.role === 'assistant'"
+                class="message-markdown"
+                v-html="renderMarkdown(message.content)"
+              ></div>
+              <p v-else>{{ message.content }}</p>
               <div v-if="message.citations?.length" class="message-citations">
                 <span
                   v-for="citation in message.citations"
