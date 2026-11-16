@@ -54,7 +54,26 @@ async function runReview() {
     await finishReviewProgress(project.review?.mode === 'ai' ? '模型评审完成' : '规则辅助评审完成')
   } catch (e) { error.value = e.message; await finishReviewProgress('评审未完成') } finally { reviewing.value = false }
 }
-function importText(event) { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { form.material = String(reader.result || '') }; reader.readAsText(file) }
+async function importMaterial(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  error.value = ''
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  try {
+    if (['txt', 'md', 'markdown'].includes(extension)) form.material = await file.text()
+    else if (extension === 'docx') {
+      const { default: mammoth } = await import('mammoth')
+      form.material = (await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value
+    }
+    else if (['xls', 'xlsx'].includes(extension)) {
+      const XLSX = await import('xlsx')
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+      form.material = workbook.SheetNames.map((name) => `【工作表：${name}】\n${XLSX.utils.sheet_to_csv(workbook.Sheets[name], { blankrows: false })}`).join('\n\n')
+    } else throw new Error('仅支持DOCX、XLS/XLSX、Markdown和TXT文件。')
+    if (!form.material.trim()) throw new Error('没有从文件中提取到可供AI读取的文字内容。')
+    form.material = `【文件：${file.name}】\n${form.material}`
+  } catch (e) { error.value = `材料读取失败：${e.message}` } finally { event.target.value = '' }
+}
 onMounted(() => loadProjects().catch((e) => { error.value = e.message }))
 onBeforeUnmount(() => clearInterval(reviewTimer))
 </script>
@@ -71,6 +90,6 @@ onBeforeUnmount(() => clearInterval(reviewTimer))
         <section v-else class="review-empty"><div><ScanSearch :size="32" /></div><h2>项目已就绪，等待首次评审</h2><p>AI Agent将读取材料、检索证据并生成六维评分与改进路线。</p><button class="button button-primary" @click="runReview"><Sparkles :size="17" />开始AI评审</button></section></template>
       </main>
     </div>
-    <div v-if="showCreate" class="modal-backdrop" @click.self="showCreate = false"><form class="project-modal" @submit.prevent="createProject"><div class="modal-heading"><div><p class="kicker">NEW REVIEW</p><h2>创建评审项目</h2></div><button type="button" class="icon-button" @click="showCreate = false"><X :size="19" /></button></div><label>项目名称<input v-model="form.name" required /></label><label>项目方向<select v-model="form.category"><option>AI教育与学习平台</option><option>AI Agent智能助手</option><option>RAG知识问答系统</option><option>AI协同办公工具</option></select></label><label>项目简介<textarea v-model="form.description" rows="3" required></textarea></label><label>项目材料<textarea v-model="form.material" rows="7"></textarea></label><label class="file-import"><Upload :size="17" />导入TXT / Markdown<input type="file" accept=".txt,.md" @change="importText" /></label><p v-if="error" class="error-message">{{ error }}</p><div class="modal-actions"><button type="button" class="button button-ghost" @click="showCreate = false">取消</button><button class="button button-primary" :disabled="loading">创建项目<ArrowRight :size="16" /></button></div></form></div>
+    <div v-if="showCreate" class="modal-backdrop" @click.self="showCreate = false"><form class="project-modal" @submit.prevent="createProject"><div class="modal-heading"><div><p class="kicker">NEW REVIEW</p><h2>创建评审项目</h2></div><button type="button" class="icon-button" @click="showCreate = false"><X :size="19" /></button></div><label>项目名称<input v-model="form.name" required /></label><label>项目方向<select v-model="form.category"><option>AI教育与学习平台</option><option>AI Agent智能助手</option><option>RAG知识问答系统</option><option>AI协同办公工具</option></select></label><label>项目简介<textarea v-model="form.description" rows="3" required></textarea></label><label>项目材料<textarea v-model="form.material" rows="7"></textarea></label><label class="file-import"><Upload :size="17" />导入DOCX、Excel、Markdown或TXT<input type="file" accept=".docx,.xls,.xlsx,.txt,.md,.markdown" @change="importMaterial" /></label><p v-if="error" class="error-message">{{ error }}</p><div class="modal-actions"><button type="button" class="button button-ghost" @click="showCreate = false">取消</button><button class="button button-primary" :disabled="loading">创建项目<ArrowRight :size="16" /></button></div></form></div>
   </component>
 </template>

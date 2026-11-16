@@ -153,8 +153,7 @@ function createConfig(type) {
     return {
       ...common,
       sourceMode: "files",
-      acceptedTypes: "PDF, DOCX, Markdown, 图片",
-      parseImages: true,
+      acceptedTypes: "DOCX, XLS/XLSX, Markdown, TXT",
       files: [],
       folderFiles: [],
       repositoryUrl: "",
@@ -202,7 +201,7 @@ const nodes = ref([
       label: "读取项目材料",
       kind: "INPUT",
       type: "input",
-      description: "README、方案书与截图",
+      description: "Word、Excel与Markdown材料",
       status: "idle",
       config: createConfig("input"),
     },
@@ -551,22 +550,55 @@ function readFileProgress(file, offset, totalSize, readAsText = false) {
           Math.round(((offset + progress.loaded) / totalSize) * 100),
         );
     };
-    reader.onload = () => resolve(readAsText ? String(reader.result || "") : "");
+    reader.onload = () => resolve(reader.result);
     reader.onerror = () =>
       reject(reader.error || new Error(`无法读取${file.name}`));
     if (readAsText) reader.readAsText(file);
     else reader.readAsArrayBuffer(file);
   });
 }
+function fileExtension(file) {
+  return file.name.split(".").pop()?.toLowerCase() || "";
+}
 function canReadText(file) {
-  const extension = file.name.split(".").pop()?.toLowerCase();
+  const extension = fileExtension(file);
   return file.type.startsWith("text/") || ["txt", "md", "markdown", "json", "csv", "tsv", "js", "ts", "jsx", "tsx", "vue", "html", "css", "py", "java", "c", "cpp", "h", "hpp", "xml", "yaml", "yml", "sql"].includes(extension);
+}
+function isSupportedMaterial(file) {
+  return canReadText(file) || ["docx", "xls", "xlsx"].includes(fileExtension(file));
+}
+async function extractMaterialContent(file, offset, totalSize) {
+  const extension = fileExtension(file);
+  if (canReadText(file)) {
+    return String(await readFileProgress(file, offset, totalSize, true) || "");
+  }
+  const arrayBuffer = await readFileProgress(file, offset, totalSize, false);
+  if (extension === "docx") {
+    const { default: mammoth } = await import("mammoth");
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value || "";
+  }
+  if (["xls", "xlsx"].includes(extension)) {
+    const XLSX = await import("xlsx");
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+    return workbook.SheetNames.map((sheetName) => {
+      const rows = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName], { blankrows: false });
+      return `【工作表：${sheetName}】\n${rows}`;
+    }).join("\n\n");
+  }
+  return "";
 }
 async function uploadFiles(event, target = "files", useRelativePath = false) {
   const input = event.target;
   const files = [...(input.files || [])];
   const nodeId = selectedNodeId.value;
   if (!files.length || !nodeId) return;
+  const unsupported = files.filter((file) => !isSupportedMaterial(file));
+  if (unsupported.length) {
+    runMessage.value = `不支持${unsupported.map((file) => file.name).join("、")}，请上传DOCX、XLS/XLSX、MD或TXT文件`;
+    input.value = "";
+    return;
+  }
   uploadingNodeId.value = nodeId;
   uploadProgress.value = 0;
   const totalSize = Math.max(
@@ -577,16 +609,15 @@ async function uploadFiles(event, target = "files", useRelativePath = false) {
   try {
     const uploadedFiles = [];
     for (const file of files) {
-      const readable = canReadText(file);
-      const content = await readFileProgress(file, offset, totalSize, readable);
+      const content = await extractMaterialContent(file, offset, totalSize);
       offset += Math.max(1, file.size);
       uploadedFiles.push({
         name: useRelativePath ? file.webkitRelativePath || file.name : file.name,
         type: file.type || "application/octet-stream",
         size: file.size,
-        readable,
-        content: readable ? content.slice(0, 150000) : "",
-        truncated: readable && content.length > 150000,
+        readable: Boolean(content.trim()),
+        content: content.slice(0, 150000),
+        truncated: content.length > 150000,
       });
     }
     nodes.value = nodes.value.map((node) =>
@@ -609,7 +640,8 @@ async function uploadFiles(event, target = "files", useRelativePath = false) {
         : node,
     );
     uploadProgress.value = 100;
-    runMessage.value = `已上传${files.length}个文件到「${nodes.value.find((node) => node.id === nodeId)?.data.label}」`;
+    const extractedCharacters = uploadedFiles.reduce((sum, file) => sum + file.content.length, 0);
+    runMessage.value = `已上传${files.length}个文件并提取${extractedCharacters}字正文到「${nodes.value.find((node) => node.id === nodeId)?.data.label}」`;
     await new Promise((resolve) => setTimeout(resolve, 420));
   } catch (error) {
     runMessage.value = `文件上传失败：${error.message}`;
@@ -681,6 +713,14 @@ function updateSelected() {
 }
 async function runWorkflow() {
   if (running.value) return;
+  const materials = nodes.value.flatMap((node) => [
+    ...(node.data.config?.files || []),
+    ...(node.data.config?.folderFiles || []),
+  ]);
+  if (materials.length && !materials.some((file) => uploadedFileContent(file))) {
+    runMessage.value = "现有材料是旧版文件记录，仅保存了文件名。请删除后重新上传，系统提取正文后才能运行AI评审";
+    return;
+  }
   const providerId =
     nodes.value.find((node) => ["agent", "process"].includes(node.data.type))
       ?.data.config?.providerId || "deepseek";
@@ -724,10 +764,6 @@ async function runWorkflow() {
   const duration = ((performance.now() - startedAt) / 1000).toFixed(1);
   runMessage.value = "正在生成评审分析...";
   try {
-    const materials = nodes.value.flatMap((node) => [
-      ...(node.data.config?.files || []),
-      ...(node.data.config?.folderFiles || []),
-    ]);
     const readableMaterials = materials.filter((file) => uploadedFileContent(file));
     const materialText = readableMaterials
       .map((file) => `【文件：${uploadedFileName(file)}】\n${uploadedFileContent(file)}`)
@@ -1181,13 +1217,13 @@ onBeforeUnmount(() => {
                     ? `正在上传 ${uploadProgress}%`
                     : "上传项目材料"
                 }}</strong
-                ><small>支持多个方案文档、截图与说明文件</small
+                ><small>支持DOCX、XLS/XLSX、Markdown与TXT</small
                 ><i v-if="uploadingNodeId === selectedNode.id"
                   ><b :style="{ width: `${uploadProgress}%` }"></b></i
                 ><input
                   type="file"
                   multiple
-                  accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg,.webp"
+                  accept=".docx,.xls,.xlsx,.txt,.md,.markdown"
                   :disabled="uploadingNodeId === selectedNode.id"
                   @change="uploadInputFiles($event, 'files')"
               /></label>
@@ -1221,6 +1257,7 @@ onBeforeUnmount(() => {
                   webkitdirectory
                   directory
                   multiple
+                  accept=".docx,.xls,.xlsx,.txt,.md,.markdown"
                   :disabled="uploadingNodeId === selectedNode.id"
                   @change="uploadInputFiles($event, 'folderFiles')"
               /></label>
@@ -1250,12 +1287,6 @@ onBeforeUnmount(() => {
               >支持格式<input
                 :value="selectedNode.data.config.acceptedTypes"
                 readonly /></label
-            ><label class="config-toggle"
-              ><input
-                v-model="selectedNode.data.config.parseImages"
-                type="checkbox"
-                @change="updateSelected"
-              /><span>解析材料中的截图与图片</span></label
             >
           </div>
           <div
@@ -1271,13 +1302,13 @@ onBeforeUnmount(() => {
                   ? `正在上传 ${uploadProgress}%`
                   : "上传知识库文件"
               }}</strong
-              ><small>PDF、DOCX、TXT、Markdown</small
+              ><small>DOCX、XLS/XLSX、Markdown与TXT</small
               ><i v-if="uploadingNodeId === selectedNode.id"
                 ><b :style="{ width: `${uploadProgress}%` }"></b></i
               ><input
                 type="file"
                 multiple
-                accept=".pdf,.doc,.docx,.txt,.md"
+                accept=".docx,.xls,.xlsx,.txt,.md,.markdown"
                 :disabled="uploadingNodeId === selectedNode.id"
                 @change="uploadKnowledgeFiles"
             /></label>
