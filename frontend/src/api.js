@@ -11,6 +11,24 @@ export async function api(path, options = {}) {
     },
   })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.message || '请求失败')
+  if (!response.ok) {
+    const captchaCode = response.headers.get('x-captcha-verify-code')
+    const captchaMessages = {
+      F001: '安全验证未通过，请重新验证。',
+      F003: '安全验证参数无效，请刷新页面后重试。',
+      F008: '安全验证已使用，请重新验证。',
+      F010: '当前网络验证次数过多，请稍后重试。',
+      F011: '当前设备验证次数过多，请稍后重试。',
+      F014: '安全验证已失效，请重新验证。',
+      F015: '安全验证未完成，请重试。',
+      F018: '安全验证已使用，请重新验证。',
+      F019: '安全验证已超时，请重新验证。',
+      F020: '安全验证与当前请求不匹配，请重新验证。',
+      F021: '安全验证场景不匹配，请联系管理员。',
+      F022: '安全验证配置异常，请联系管理员。',
+      F024: '当前操作环境未通过安全验证。',
+    }
+    throw new Error(captchaMessages[captchaCode] || data.message || '请求失败')
+  }
   return data
 }

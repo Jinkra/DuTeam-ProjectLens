@@ -21,6 +21,7 @@ import {
 } from "lucide-vue-next";
 import SiteFooter from "./SiteFooter.vue";
 import { api } from "../api";
+import { captchaRequestHeaders, refreshAliyunCaptcha, verifyWithAliyunCaptcha } from "../aliyunCaptcha";
 
 const props = defineProps({ user: Object });
 const emit = defineEmits(["navigate", "logout", "authenticated"]);
@@ -157,8 +158,10 @@ async function loginAdmin() {
   loggingIn.value = true;
   error.value = "";
   try {
+    const captchaVerifyParam = await verifyWithAliyunCaptcha();
     const result = await api("/auth/login", {
       method: "POST",
+      headers: captchaRequestHeaders(captchaVerifyParam),
       body: JSON.stringify({ email: username.value, password: password.value }),
     });
     if (result.user.role !== "admin")
@@ -169,6 +172,7 @@ async function loginAdmin() {
   } catch (e) {
     error.value = e.message;
   } finally {
+    refreshAliyunCaptcha();
     loggingIn.value = false;
   }
 }

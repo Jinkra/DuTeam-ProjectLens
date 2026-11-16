@@ -2,6 +2,7 @@
 import { reactive, ref, watch } from 'vue'
 import { ArrowRight, X } from 'lucide-vue-next'
 import { api } from '../api'
+import { captchaRequestHeaders, refreshAliyunCaptcha, verifyWithAliyunCaptcha } from '../aliyunCaptcha'
 const props = defineProps({ initialMode: { type: String, default: 'login' } })
 const emit = defineEmits(['close', 'authenticated'])
 const mode = ref(props.initialMode)
@@ -11,9 +12,10 @@ watch(() => props.initialMode, (value) => { mode.value = value })
 async function submit() {
   loading.value = true; error.value = ''
   try {
-    const data = await api(mode.value === 'login' ? '/auth/login' : '/auth/register', { method: 'POST', body: JSON.stringify(form) })
+    const captchaVerifyParam = await verifyWithAliyunCaptcha()
+    const data = await api(mode.value === 'login' ? '/auth/login' : '/auth/register', { method: 'POST', headers: captchaRequestHeaders(captchaVerifyParam), body: JSON.stringify(form) })
     emit('authenticated', data)
-  } catch (e) { error.value = e.message } finally { loading.value = false }
+  } catch (e) { error.value = e.message } finally { refreshAliyunCaptcha(); loading.value = false }
 }
 </script>
 <template>

@@ -16,6 +16,7 @@ import WorkspaceProjects from './components/WorkspaceProjects.vue'
 import AccountMembership from './components/AccountMembership.vue'
 import { getActiveWorkspace, loadAccountProjects } from './projectStorage'
 import { ArrowUp } from 'lucide-vue-next'
+import { initializeAliyunCaptcha } from './aliyunCaptcha'
 
 const token = ref(localStorage.getItem('projectlens_token'))
 const user = ref(JSON.parse(localStorage.getItem('projectlens_user') || 'null'))
@@ -101,6 +102,7 @@ onMounted(() => {
   window.addEventListener('projectlens:active-project-changed', syncActiveProject)
   window.addEventListener('scroll', syncBackToTop, { passive: true })
   syncBackToTop()
+  initializeAliyunCaptcha().catch((error) => console.error(error))
 })
 onBeforeUnmount(() => {
   window.removeEventListener('storage', syncSession)
@@ -136,6 +138,8 @@ onBeforeUnmount(() => {
     </div>
   </Transition>
   <AuthModal v-if="authOpen" :initial-mode="authMode" @close="authOpen = false" @authenticated="authenticated" />
+  <div id="aliyun-captcha-element" class="aliyun-captcha-element" aria-hidden="true"></div>
+  <button id="aliyun-captcha-trigger" class="aliyun-captcha-trigger" type="button" tabindex="-1" aria-hidden="true"></button>
   <Transition name="back-to-top">
     <button v-if="showBackToTop" class="back-to-top-button" type="button" title="返回顶部" aria-label="返回页面顶部" @click="backToTop"><ArrowUp :size="19" /></button>
   </Transition>
