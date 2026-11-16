@@ -215,7 +215,7 @@ onBeforeUnmount(stopTimer);
 </script>
 
 <template>
-  <div class="project-assistant-page">
+  <div class="project-tool-view project-assistant-page">
     <ProjectContextBar
       :project="project"
       active="assistant"

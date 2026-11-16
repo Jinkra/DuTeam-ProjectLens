@@ -41,7 +41,7 @@ copy frontend\.env.example frontend\.env
 npm run dev
 ```
 
-打开 `http://localhost:5173`。API 默认运行在 `http://localhost:3001`。
+打开 `http://localhost:5173`。API 默认运行在 `http://localhost:4100`。
 
 ## 环境变量
 

@@ -10,7 +10,7 @@ import { createReview } from './review.js'
 import { readStore, updateStore } from './store.js'
 
 const app = express()
-const port = Number(process.env.PORT || 3001)
+const port = Number(process.env.PORT || 4100)
 const configuredOrigins = (process.env.WEB_ORIGINS || process.env.WEB_ORIGIN || '')
   .split(',')
   .map((origin) => origin.trim())
