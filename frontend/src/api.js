@@ -28,7 +28,12 @@ export async function api(path, options = {}) {
       F022: '安全验证配置异常，请联系管理员。',
       F024: '当前操作环境未通过安全验证。',
     }
-    throw new Error(captchaMessages[captchaCode] || data.message || '请求失败')
+    const statusMessages = {
+      524: '模型响应超时，请稍后重试或在管理后台切换响应更快的模型。',
+      502: '模型服务暂时不可用，请稍后重试。',
+      504: '模型服务响应超时，请稍后重试。',
+    }
+    throw new Error(captchaMessages[captchaCode] || data.message || statusMessages[response.status] || `请求失败（${response.status}）`)
   }
   return data
 }

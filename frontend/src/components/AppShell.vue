@@ -11,7 +11,7 @@ const projectTool = computed(() => ['review', 'analysis', 'coach', 'assistant'].
 const currentPlan = ref(props.user?.plan || 'free')
 const planLabel = computed(() => ({ free: 'Free', pro: 'Pro', team: 'Team' }[currentPlan.value] || 'Free'))
 onMounted(async () => {
-  try { currentPlan.value = (await api('/membership')).plan || currentPlan.value } catch { /* Keep the login snapshot when membership refresh is unavailable. */ }
+  try { currentPlan.value = (await api('/subscription')).plan || currentPlan.value } catch { /* Keep the login snapshot when membership refresh is unavailable. */ }
 })
 </script>
 <template>

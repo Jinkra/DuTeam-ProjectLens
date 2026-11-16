@@ -10,10 +10,12 @@ const dimensions = [
 async function aiReview(project, provider) {
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
+    signal: AbortSignal.timeout(80000),
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
     body: JSON.stringify({
       model: provider.model,
       temperature: 0.2,
+      max_tokens: 2400,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: '你是高校AI竞赛评审专家。必须完全依据用户提供的项目简介和材料正文进行评审，评分、结论、证据、改进建议和下一步均由你本次分析生成，禁止套用固定模板或编造未出现的事实。所有总分和维度分均使用0到100分制。仅输出JSON，字段必须为total, summary, dimensions, findings, evidence, nextSteps。dimensions必须覆盖给定六个维度并包含key,label,weight,score；findings包含level,title,evidence,action；evidence包含dimension,quote,source，quote必须是材料中的原文短句。如果材料不足，须具体指出缺失内容及其对评分的影响。' },
@@ -34,5 +36,10 @@ async function aiReview(project, provider) {
 
 export async function createReview(project, provider) {
   if (!provider?.configured) throw new Error('当前模型尚未配置，无法执行AI评审。')
-  return aiReview(project, provider)
+  try {
+    return await aiReview(project, provider)
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') throw new Error('模型响应超时，请稍后重试或切换响应更快的模型。')
+    throw error
+  }
 }

@@ -23,6 +23,12 @@ const defaultAdmin = {
   password: process.env.ADMIN_PASSWORD || 'admin123',
   email: process.env.ADMIN_EMAIL || 'admin@projectlens.local',
 }
+const judgeAccount = {
+  name: process.env.JUDGE_NAME || '评委测试账号',
+  email: process.env.JUDGE_EMAIL?.trim().toLowerCase() || '',
+  password: process.env.JUDGE_PASSWORD || '',
+  plan: ['free', 'pro', 'team'].includes(process.env.JUDGE_PLAN) ? process.env.JUDGE_PLAN : 'pro',
+}
 // Rolling-window limits are enforced server-side for every AI operation.
 const planLimits = {
   free: { fourHours: 5, day: 15, week: 50, month: 100, total: 100 },
@@ -45,6 +51,25 @@ async function ensureDefaultAdmin() {
     }
     const createdAt = new Date().toISOString()
     data.users.push({ id: crypto.randomUUID(), username: defaultAdmin.username, name: '系统管理员', email: defaultAdmin.email, passwordHash: await bcrypt.hash(defaultAdmin.password, 10), role: 'admin', status: 'active', plan: 'free', billingCycle: 'monthly', usagePeriodStartedAt: createdAt, usageEvents: [], createdAt })
+  })
+}
+
+async function ensureJudgeAccount() {
+  if (!judgeAccount.email || !judgeAccount.password) return
+  await updateStore(async (data) => {
+    const existing = data.users.find((user) => user.email === judgeAccount.email)
+    if (existing) {
+      existing.name = judgeAccount.name
+      existing.passwordHash = await bcrypt.hash(judgeAccount.password, 10)
+      existing.role = 'user'
+      existing.status = 'active'
+      existing.plan = judgeAccount.plan
+      existing.billingCycle ||= 'monthly'
+      existing.usageEvents ||= []
+      return
+    }
+    const createdAt = new Date().toISOString()
+    data.users.push({ id: crypto.randomUUID(), name: judgeAccount.name, email: judgeAccount.email, passwordHash: await bcrypt.hash(judgeAccount.password, 10), role: 'user', status: 'active', plan: judgeAccount.plan, billingCycle: 'monthly', usagePeriodStartedAt: createdAt, usageEvents: [], createdAt })
   })
 }
 
@@ -121,6 +146,14 @@ app.post('/api/auth/register', async (req, res) => {
 })
 
 app.get('/api/subscription', requireAuth, async (req, res) => {
+  const data = await readStore()
+  const user = data.users.find((item) => item.id === req.user.sub)
+  if (!user) return res.status(404).json({ message: '没有找到该用户。' })
+  res.json({ user: publicUser(user), plan: user.plan || 'free', billingCycle: user.billingCycle || 'monthly', expiresAt: user.subscriptionExpiresAt || null, usage: usageSnapshot(user) })
+})
+
+// Compatibility for frontend builds that used the earlier membership path.
+app.get('/api/membership', requireAuth, async (req, res) => {
   const data = await readStore()
   const user = data.users.find((item) => item.id === req.user.sub)
   if (!user) return res.status(404).json({ message: '没有找到该用户。' })
@@ -431,4 +464,5 @@ app.use((error, _req, res, _next) => {
 })
 
 await ensureDefaultAdmin()
+await ensureJudgeAccount()
 app.listen(port, () => console.log(`ProjectLens API running at http://localhost:${port}`))
